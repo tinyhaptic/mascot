@@ -113,6 +113,8 @@ const READ = {
     most: 18,
     copied: 650,
 };
+// Sparks: how many bursts the file has, and how soon (ms) a poke can throw another.
+const SPARKS = { bursts: 4, apart: 180 };
 // What it throws onto the page, by default: its outline colour at this opacity.
 const FADE = { poke: 0.55, z: 0.45 };
 // What the page is doing, watched once and shared by every mascot on it.
@@ -514,12 +516,19 @@ export function enliven(root, { mood, colors: inks = {}, assets = `/mascot/${VER
         paint("impactColor", hard ? argb(COLOR.rage) : pokeColor());
         fire("impact");
     };
-    // Fury: it shakes, and sparks fly off it.
+    // Fury: it shakes, and sparks fly off it. Each burst flies out whole; the next poke throws
+    // the next of the file's bursts, so they overlap rather than cut each other short.
+    let burst = 0;
+    let burstAt = 0;
     const rage = () => {
         if (still())
             return;
-        set("sparkTurn", rand(-0.4, 0.4));
         fire("rage");
+        const now = performance.now();
+        if (now - burstAt < SPARKS.apart)
+            return;
+        burstAt = now;
+        fire(`spark${(burst++ % SPARKS.bursts) + 1}`);
     };
     // Somewhere on the page, off to a side of it: something to glance at.
     const elsewhere = () => {

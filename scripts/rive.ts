@@ -20,7 +20,7 @@
  * - The rest are layers of their own, each driven by one view model property:
  *   a blink (`shut`), the pupils opening in the dark (`dark`), dizzy pupils
  *   (`dizzy`), z's while `asleep`, the jolt of a poke (`wiggle`) or a rage
- *   (`rage`, with sparks), and the lines a poke throws out (`impact`, at
+ *   (`rage`, and sparks: `spark1`…`spark4`, taken in turn), and the lines a poke throws out (`impact`, at
  *   `pokeX`/`pokeY`). Breathing and the knocked-out spirals' spin always run.
  * - Where the pupils look (`lookX`/`lookY`) and how the head follows
  *   (`headX`/`headY`) are bound numbers, eased by an interpolating converter.
@@ -124,7 +124,12 @@ const P = {
 	pokeX: prop("pokeX", "Number", 16),
 	pokeY: prop("pokeY", "Number", 16),
 	impactTurn: prop("impactTurn", "Number", 0),
-	sparkTurn: prop("sparkTurn", "Number", 0),
+	// One trigger per burst of sparks: the page takes them in turn, so a burst still flying
+	// isn't cut short by the next.
+	spark1: prop("spark1", "Trigger"),
+	spark2: prop("spark2", "Trigger"),
+	spark3: prop("spark3", "Trigger"),
+	spark4: prop("spark4", "Trigger"),
 	ink: prop("ink", "Color", "FF0A0A0A"),
 	ink3: prop("ink3", "Color", "FF999999"),
 	impactColor: prop("impactColor", "Color", "FF787878"),
@@ -670,7 +675,8 @@ const mouthShape = el(
 );
 
 // ── particles ───────────────────────────────────────────────────────────────
-// A fixed scatter, so every rage looks the same up close; `sparkTurn` swings the whole burst.
+// Bursts of sparks, each its own fixed scatter swung a little its own way. Several, so they
+// can overlap: each angry poke throws a fresh one while the last are still flying.
 const rng = (() => {
 	let seed = 7;
 	return (min: number, max: number) => {
@@ -679,49 +685,58 @@ const rng = (() => {
 	};
 })();
 const R = 16 * S; // the mascot's half-width
-const sparks = Array.from({ length: 8 }, (_, i) => {
-	const way = -Math.PI + ((i + 0.5) / 8) * Math.PI + rng(-0.25, 0.25); // upward and outward
-	const [far, turn, size, ms] = [
-		R * rng(1.3, 2.4),
-		rng(-2.4, 2.4),
-		6.4 * S * rng(0.6, 1.2),
-		rng(360, 680),
-	];
-	return {
-		id: id(),
-		way,
-		far,
-		turn,
-		size,
-		frames: Math.round((ms / 1000) * 60),
-	};
-});
-const sparkNode = id();
-const sparkShapes = el(
-	"Node",
-	{ x: at(16), y: at(12.8), name: "Sparks", id: sparkNode },
-	el("DataBindContext", {
-		sourcePathIds: `${VM}-${P.sparkTurn}`,
-		propertyKey: K.rotation,
+const BURSTS = 4;
+const bursts = Array.from({ length: BURSTS }, (_, n) => ({
+	node: id(),
+	trigger: [P.spark1, P.spark2, P.spark3, P.spark4][n],
+	turn: rng(-0.4, 0.4),
+	sparks: Array.from({ length: 8 }, (_, i) => {
+		const way = -Math.PI + ((i + 0.5) / 8) * Math.PI + rng(-0.25, 0.25); // upward and outward
+		const [far, turn, size, ms] = [
+			R * rng(1.3, 2.4),
+			rng(-2.4, 2.4),
+			6.4 * S * rng(0.6, 1.2),
+			rng(360, 680),
+		];
+		return {
+			id: id(),
+			way,
+			far,
+			turn,
+			size,
+			frames: Math.round((ms / 1000) * 60),
+		};
 	}),
-	...sparks.map((s) =>
-		el(
-			"Shape",
-			{
-				x: Math.cos(s.way) * R * 0.8,
-				y: Math.sin(s.way) * R * 0.8,
-				opacity: 0,
-				name: "Spark",
-				id: s.id,
-			},
-			el("Star", {
-				points: 4,
-				innerRadius: 0.34,
-				width: s.size,
-				height: s.size,
-				name: "Path",
-			}),
-			fill(argb(COLOR.rage)),
+}));
+const sparkShapes = bursts.map((burst, n) =>
+	el(
+		"Node",
+		{
+			x: at(16),
+			y: at(12.8),
+			rotation: burst.turn,
+			name: `Sparks ${n + 1}`,
+			id: burst.node,
+		},
+		...burst.sparks.map((s) =>
+			el(
+				"Shape",
+				{
+					x: Math.cos(s.way) * R * 0.8,
+					y: Math.sin(s.way) * R * 0.8,
+					opacity: 0,
+					name: "Spark",
+					id: s.id,
+				},
+				el("Star", {
+					points: 4,
+					innerRadius: 0.34,
+					width: s.size,
+					height: s.size,
+					name: "Path",
+				}),
+				fill(argb(COLOR.rage)),
+			),
 		),
 	),
 );
@@ -1007,49 +1022,54 @@ for (const [share, x, y, rot] of [
 }
 const rage = animation("Rage", rageTrack, RAGE);
 
-const sparkTrack = track();
-const SPARKS = Math.max(...sparks.map((s) => s.frames));
-for (const s of sparks) {
-	const [x0, y0] = [Math.cos(s.way) * R * 0.8, Math.sin(s.way) * R * 0.8];
-	put(
-		sparkTrack,
-		s.id,
-		K.x,
-		{ frame: 0, value: x0, ease: FLING },
-		{ frame: s.frames, value: x0 + Math.cos(s.way) * s.far },
-	);
-	put(
-		sparkTrack,
-		s.id,
-		K.y,
-		{ frame: 0, value: y0, ease: FLING },
-		{ frame: s.frames, value: y0 + Math.sin(s.way) * s.far },
-	);
-	put(
-		sparkTrack,
-		s.id,
-		K.rotation,
-		{ frame: 0, value: 0, ease: FLING },
-		{ frame: s.frames, value: s.turn },
-	);
-	for (const k of [K.scaleX, K.scaleY])
+const sparkAnims = bursts.map((burst, n) => {
+	const sparkTrack = track();
+	for (const s of burst.sparks) {
+		const [x0, y0] = [Math.cos(s.way) * R * 0.8, Math.sin(s.way) * R * 0.8];
 		put(
 			sparkTrack,
 			s.id,
-			k,
-			{ frame: 0, value: 0.3, ease: FLING },
-			{ frame: s.frames, value: 1 },
+			K.x,
+			{ frame: 0, value: x0, ease: FLING },
+			{ frame: s.frames, value: x0 + Math.cos(s.way) * s.far },
 		);
-	put(
+		put(
+			sparkTrack,
+			s.id,
+			K.y,
+			{ frame: 0, value: y0, ease: FLING },
+			{ frame: s.frames, value: y0 + Math.sin(s.way) * s.far },
+		);
+		put(
+			sparkTrack,
+			s.id,
+			K.rotation,
+			{ frame: 0, value: 0, ease: FLING },
+			{ frame: s.frames, value: s.turn },
+		);
+		for (const k of [K.scaleX, K.scaleY])
+			put(
+				sparkTrack,
+				s.id,
+				k,
+				{ frame: 0, value: 0.3, ease: FLING },
+				{ frame: s.frames, value: 1 },
+			);
+		put(
+			sparkTrack,
+			s.id,
+			K.opacity,
+			{ frame: 0, value: 1 },
+			{ frame: Math.round(s.frames * 0.6), value: 1 },
+			{ frame: s.frames, value: 0 },
+		);
+	}
+	return animation(
+		`Sparks ${n + 1}`,
 		sparkTrack,
-		s.id,
-		K.opacity,
-		{ frame: 0, value: 1 },
-		{ frame: Math.round(s.frames * 0.6), value: 1 },
-		{ frame: s.frames, value: 0 },
+		Math.max(...burst.sparks.map((s) => s.frames)),
 	);
-}
-const sparksAnim = animation("Sparks", sparkTrack, SPARKS);
+});
 
 const impactTrack = track();
 for (const l of impactLines) {
@@ -1277,29 +1297,50 @@ const whirl = state(dizzy, [
 ]);
 still.out = [{ to: whirl.id, ms: 200, if: when.is(P.dizzy, true) }];
 
-const calm = state(rest);
-const jolt = state(wiggle, [], true);
-const fury = state(rage, [], true);
-calm.out = [
-	{ to: jolt.id, if: when.fired(P.wiggle) },
-	{ to: fury.id, if: when.fired(P.rage) },
-];
-jolt.out = [
-	{ to: fury.id, if: when.fired(P.rage) },
-	{ to: calm.id, atEnd: true },
-];
-fury.out = [
-	{ to: jolt.id, if: when.fired(P.wiggle) },
-	{ to: calm.id, atEnd: true },
-];
+// A one-off animation that a trigger starts, and starts over if fired again while it plays
+// (two states playing it, so each can go to the other). Blended over `mix` ms when it restarts.
+const STARTS_OVER = 50;
+const again = (anim: string) => [state(anim, [], true), state(anim, [], true)];
+const startOver = (
+	[a, b]: State[],
+	trigger: string,
+	after: Go[],
+	mix = STARTS_OVER,
+) => {
+	a.out = [{ to: b.id, ms: mix, if: when.fired(trigger) }, ...after];
+	b.out = [{ to: a.id, ms: mix, if: when.fired(trigger) }, ...after];
+};
 
-const noSparks = state(rest);
-const sparking = state(sparksAnim, [{ to: noSparks.id, atEnd: true }], true);
-noSparks.out = [{ to: sparking.id, if: when.fired(P.rage) }];
+// A poke jolts it; fury shakes it, and outranks a poke (an angry poke fires both).
+const calm = state(rest);
+const jolts = again(wiggle);
+const furies = again(rage);
+const toFury: Go = {
+	to: furies[0].id,
+	ms: STARTS_OVER,
+	if: when.fired(P.rage),
+};
+const toJolt: Go = {
+	to: jolts[0].id,
+	ms: STARTS_OVER,
+	if: when.fired(P.wiggle),
+};
+calm.out = [toFury, toJolt];
+startOver(jolts, P.wiggle, [toFury, { to: calm.id, atEnd: true }]);
+startOver(furies, P.rage, [toJolt, { to: calm.id, atEnd: true }]);
+
+// Each burst of sparks plays out whole; the page fires the next burst's trigger.
+const sparkLayers = bursts.map((burst, n) => {
+	const none = state(rest);
+	const flying = state(sparkAnims[n], [{ to: none.id, atEnd: true }], true);
+	none.out = [{ to: flying.id, if: when.fired(burst.trigger) }];
+	return layer(`Sparks ${n + 1}`, [{ to: none.id }], [none, flying]);
+});
 
 const noLines = state(rest);
-const lines = state(impactAnim, [{ to: noLines.id, atEnd: true }], true);
-noLines.out = [{ to: lines.id, if: when.fired(P.impact) }];
+const lines = again(impactAnim);
+noLines.out = [{ to: lines[0].id, if: when.fired(P.impact) }];
+startOver(lines, P.impact, [{ to: noLines.id, atEnd: true }], 0);
 
 const awake = state(noZs);
 const snoring = state(
@@ -1310,16 +1351,16 @@ const snoring = state(
 awake.out = [{ to: snoring.id, if: when.is(P.asleep, true) }];
 
 const upright = state(restPop);
-const popping = state(popAnim, [], true);
+const pops = again(popAnim);
 const hopping = state(hopAnim, [], true);
 upright.out = [
 	{ to: hopping.id, if: when.fired(P.hop) },
-	{ to: popping.id, if: when.fired(P.pop) },
+	{ to: pops[0].id, if: when.fired(P.pop) },
 ];
-popping.out = [
+startOver(pops, P.pop, [
 	{ to: hopping.id, if: when.fired(P.hop) },
 	{ to: upright.id, atEnd: true },
-];
+]);
 hopping.out = [{ to: upright.id, atEnd: true }];
 
 const machine = id();
@@ -1345,11 +1386,11 @@ const machineXml = el(
 	layer("Dizzy", [{ to: still.id }], [still, whirl]),
 	loopLayer("Spin", spin),
 	loopLayer("Breathe", breathe),
-	layer("Jolt", [{ to: calm.id }], [calm, jolt, fury]),
-	layer("Sparks", [{ to: noSparks.id }], [noSparks, sparking]),
-	layer("Poke lines", [{ to: noLines.id }], [noLines, lines]),
+	layer("Jolt", [{ to: calm.id }], [calm, ...jolts, ...furies]),
+	...sparkLayers,
+	layer("Poke lines", [{ to: noLines.id }], [noLines, ...lines]),
 	layer("Sleep", [{ to: awake.id }], [awake, snoring]),
-	layer("Bounce", [{ to: upright.id }], [upright, popping, hopping]),
+	layer("Bounce", [{ to: upright.id }], [upright, ...pops, hopping]),
 );
 
 // ── the file ────────────────────────────────────────────────────────────────
@@ -1371,7 +1412,7 @@ const scene = el(
 		},
 		el("LayoutComponentStyle", { name: "Artboard Style", id: artStyle }),
 		impactShapes,
-		sparkShapes,
+		...sparkShapes,
 		...zShapes,
 		el(
 			"Node",
