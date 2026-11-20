@@ -2,19 +2,56 @@
 
 The Tiny Haptic mascot: a pair of round eyes over a small mouth. One copy for the website and the accounting app.
 
-- `mascotSvg({ id, face })`: the inside of its `<svg viewBox="0 0 32 32" class="mascot">`.
-- `enliven(svg, { mood, colors })`: brings it to life (watches the cursor, blinks, gets poked, dozes). Returns a function that stops it. The theme is `data-theme` on `<html>`.
-- `mascot.css`: its animations.
-- `markup`, `portrait`, `emblem`, `poses`, `shapes`: the geometry, for favicons and images.
+```bash
+bun add github:tinyhaptic/mascot#v1.1.0
+```
 
-## Install
+## Use it
+
+React 19 (renders on the server, comes alive in the browser; its styles come with it):
+
+```tsx
+import { Mascot } from "@tinyhaptic/mascot/react";
+
+<Mascot className="size-6 text-foreground" />
+<Mascot alive={false} face="sleepy" />
+```
+
+Astro (drawn on the server, alive only with `alive`):
+
+```astro
+---
+import Mascot from "@tinyhaptic/mascot/astro";
+---
+<Mascot class="size-10 text-brand" alive />
+<Mascot class="size-28" alive mood="lost" />
+```
+
+Anything else:
+
+```js
+import { mount, mascotHtml } from "@tinyhaptic/mascot";
+
+const stop = mount(document.querySelector("#logo"), { className: "size-8" }); // draws one in, alive
+mount(document.querySelector("svg.mascot")); // or brings one drawn by mascotHtml() to life
+stop(); // stops it, and takes away a mascot it drew
+```
+
+The outline and mouth take the text colour; the eyes and pupils keep theirs. The theme is `data-theme="dark"` on `<html>`. `pokeColor` / `zColor` (`colors: { poke, z }` in `mount`) colour what it throws onto the page.
+
+Also exported: `markup`, `portrait`, `emblem`, `poses`, `shapes` (the geometry, for images), `favicon()` and `icon()` (SVG strings), and `css` (also as `@tinyhaptic/mascot/mascot.css`).
+
+## Icons
 
 ```bash
-bun add github:tinyhaptic/mascot#v1.0.0
+bunx mascot icons public           # favicon.svg and apple-touch-icon.png
+bunx mascot icons public --brand   # and brand/tinyhaptic-icon-{dark,light}.png
 ```
+
+The PNGs need `rsvg-convert` (`brew install librsvg`).
 
 ## Change it
 
-1. Edit `src/`, then `bun run check && bun run build` (`dist/` is committed: installs from GitHub don't build).
-2. Commit, `git tag v1.1.0 && git push --follow-tags`.
-3. In each project: `bun add github:tinyhaptic/mascot#v1.1.0`. On the website, also run `bun scripts/mascot-assets.ts` to redraw the favicon and brand files.
+1. Edit `src/` (styles in `src/css.ts`), then `bun run check && bun run build`. `dist/` and `mascot.css` are committed: installs from GitHub don't build.
+2. Bump `version` in package.json, commit, `git tag v1.2.0 && git push --follow-tags`.
+3. In each project: `bun add github:tinyhaptic/mascot#v1.2.0`, then `bunx mascot icons public` (the website with `--brand`).

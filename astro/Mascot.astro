@@ -1,0 +1,49 @@
+---
+/**
+ * The Tiny Haptic mascot for Astro. Drawn on the server, brought to life by
+ * the script below (only when `alive`). Size it and colour its outline with
+ * `class`; the eyes and pupils keep their colours on any theme.
+ */
+import { mascotSvg, type Face } from "../dist/index.js";
+import "../mascot.css";
+
+interface Props {
+  class?: string;
+  /** Alive it watches, blinks and can be poked. Default: a still drawing. */
+  alive?: boolean;
+  face?: Face;
+  /** A standing mood that replaces its resting calm: "lost" for a 404 page. */
+  mood?: "lost";
+  /** Colours for the lines of a poke and the z's it sleeps with. Any CSS colour. */
+  pokeColor?: string;
+  zColor?: string;
+  [attr: `data-${string}`]: string | boolean | undefined;
+}
+
+const { class: className, face, alive = false, mood, pokeColor, zColor, ...rest } = Astro.props;
+const shown = face ?? mood ?? "hi";
+const id = `mascot-${crypto.randomUUID().slice(0, 8)}`;
+---
+
+<svg
+  viewBox="0 0 32 32"
+  aria-hidden="true"
+  class:list={["mascot", shown === "dead" && "dead", className]}
+  data-alive={alive || undefined}
+  data-mood={mood}
+  data-poke={pokeColor}
+  data-z={zColor}
+  {...rest}
+  set:html={mascotSvg({ face: shown, id })}
+/>
+
+<script>
+  import { mount } from "../dist/index.js";
+
+  for (const svg of document.querySelectorAll<SVGSVGElement>("svg.mascot[data-alive]")) {
+    mount(svg, {
+      mood: svg.dataset.mood === "lost" ? "lost" : undefined,
+      colors: { poke: svg.dataset.poke, z: svg.dataset.z },
+    });
+  }
+</script>
