@@ -30,7 +30,8 @@
  *   off), a sneeze (ah… ah… choo, with a spray), or, rarely, cross-eyed or
  *   derpy. Rest the cursor on its nose and it goes cross-eyed looking at it.
  *   It eyes a destructive button sideways (`data-variant="destructive"`); any
- *   link or button can name its own face with `data-mascot-face`. While
+ *   link or button (or any element: a field it hovers or focuses) can name
+ *   its own face with `data-mascot-face`. While
  *   something on the page is `aria-busy="true"` it concentrates, tongue out.
  *   Copying gets a smug "got it"; knocked out, it comes round whistling; the
  *   lights coming on sometimes make it sneeze.
@@ -114,7 +115,9 @@ const GAZING = new Set<Face>([
 	"lost",
 	"furious",
 ]); // faces free to look around
-const PRESSABLE = "a, button, [role='button'], summary"; // what on the page can catch its eye
+// What on the page can catch its eye: anything pressable, and anything that names a face for it
+// (a password field it looks away from, say).
+const PRESSABLE = "a, button, [role='button'], summary, [data-mascot-face]";
 const SCROLL = { ms: 350, far: 300 } as const; // how long it looks the way the page moved, and how far off (px)
 // Its temper: each click adds one, and one drains away every `cool` ms. At `annoyed` it glares
 // (for `glare` ms after the last click), at `furious` it rages (for `rage` ms), sparks flying.
