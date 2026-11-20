@@ -1,0 +1,28 @@
+{
+	"name": "@tinyhaptic/mascot",
+	"version": "1.0.0",
+	"description": "The Tiny Haptic mascot: its geometry, its SVG and the script that brings it to life.",
+	"type": "module",
+	"sideEffects": [
+		"*.css"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		},
+		"./mascot.css": "./mascot.css"
+	},
+	"files": [
+		"dist",
+		"mascot.css"
+	],
+	"scripts": {
+		"build": "rm -rf dist && tsc -p tsconfig.json",
+		"check": "tsc -p tsconfig.json --noEmit && biome check ."
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.4.5",
+		"typescript": "6.0.3"
+	}
+}
