@@ -1,6 +1,6 @@
 {
 	"name": "@tinyhaptic/mascot",
-	"version": "1.2.0",
+	"version": "1.2.1",
 	"private": true,
 	"description": "The Tiny Haptic mascot: a live Rive mascot with React and Astro components, its drawing and its icons.",
 	"license": "UNLICENSED",
@@ -33,8 +33,7 @@
 		"build": "rm -rf dist && bun -e 'const { version } = await Bun.file(\"package.json\").json(); await Bun.write(\"src/version.ts\", `/** Written by the build from package.json. */\\nexport const VERSION = \"${version}\";\\n`)' && tsc -p tsconfig.json && bun -e 'import { css } from \"./dist/css.js\"; await Bun.write(\"mascot.css\", `/* Written by the build from src/css.ts. */\\n${css}`)' && chmod +x dist/cli.js",
 		"rive": "bun scripts/rive.ts",
 		"check": "tsc -p tsconfig.json --noEmit && oxfmt --check && oxlint",
-		"format": "oxfmt",
-		"prepare": "lefthook install"
+		"format": "oxfmt"
 	},
 	"dependencies": {
 		"@rive-app/webgl2": "2.49.4"
@@ -57,5 +56,8 @@
 		"react": {
 			"optional": true
 		}
-	}
+	},
+	"trustedDependencies": [
+		"lefthook"
+	]
 }
