@@ -1,6 +1,6 @@
 {
 	"name": "@tinyhaptic/mascot",
-	"version": "1.2.3",
+	"version": "1.2.4",
 	"private": true,
 	"description": "The Tiny Haptic mascot: a live Rive mascot with React and Astro components, its drawing and its icons.",
 	"license": "UNLICENSED",

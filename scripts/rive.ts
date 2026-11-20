@@ -136,7 +136,7 @@ const bind = (p: string, key: number, converterId?: string) =>
 		converterId,
 	});
 
-// Converters: the gaze darts and wobbles to a stop (googly), the head follows more slowly, the poke
+// Converters: the gaze snaps into place like a real eye, the head follows more slowly, the poke
 // lands in artboard space.
 const conv = {
 	look: id(),
@@ -149,19 +149,17 @@ const conv = {
 const ease = (x1: number, y1: number, x2: number, y2: number) =>
 	el("CubicEaseInterpolator", { x1, y1, x2, y2 });
 const converters = [
+	// A saccade: fast, slowing into place and stopping dead (no overshoot). Written every frame
+	// while the eyes follow something moving, the same ease smooths that into pursuit.
 	el(
 		"DataConverterInterpolator",
 		{
-			interpolationType: "elastic",
-			duration: 0.55,
-			name: "Dart",
+			interpolationType: "cubic",
+			duration: 0.12,
+			name: "Saccade",
 			id: conv.lookEase,
 		},
-		el("ElasticInterpolator", {
-			easingValue: "easeOut",
-			amplitude: 1,
-			period: 0.32,
-		}),
+		ease(0.25, 1, 0.5, 1),
 	),
 	el(
 		"DataConverterInterpolator",

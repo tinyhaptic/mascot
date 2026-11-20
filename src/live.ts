@@ -6,7 +6,8 @@
  * when poked, and throws off the sparks and lines. This decides what it should
  * be doing and tells it, through the file's view model:
  * - Its eyes dart to what it is looking at and settle, rather than gliding,
- *   and its head follows them a little. They wobble to a stop (googly).
+ *   and its head follows them a little. Like real eyes: a quick jump (a
+ *   saccade) to something new, smooth pursuit of something moving nearby.
  * - It watches the cursor while the cursor moves, then loses interest: it looks
  *   back at you, glances around, and now and then narrows its eyes.
  * - It blinks at a human pace, sometimes twice, often when its eyes jump far.
@@ -58,10 +59,16 @@ const rand = (min: number, max: number) => min + Math.random() * (max - min);
 const chance = (p: number) => Math.random() < p;
 const within = ([min, max]: readonly [number, number]) => rand(min, max);
 
-const DELAY = 140; // ms before the eyes react to the cursor moving
-// Eyes don't glide: they hold still, then jump once the target has moved
-// this far (face units), and need a moment before they can jump again.
-const JUMP = { min: 0.3, rest: [90, 230], blinkOver: 2.4 } as const;
+const DELAY = 90; // ms before the eyes react to the cursor moving
+// Eyes follow a target moving nearby smoothly (pursuit), once it has moved `pursue` (face
+// units). A target this `jump` far or more is a jump (a saccade), after which they need a
+// moment (`rest`, ms) before they can jump again.
+const GAZE = {
+	pursue: 0.05,
+	jump: 1.2,
+	rest: [120, 220],
+	blinkOver: 2.4,
+} as const;
 const BLINK = {
 	ms: 110,
 	slow: 240,
@@ -413,12 +420,15 @@ export function enliven(
 		const looking = glancing ?? spot;
 		const want = (GAZING.has(face) && looking && aim(looking)) || rest;
 		const far = Math.hypot(want[0] - fixed[0], want[1] - fixed[1]);
-		const waiting = far > JUMP.min && time < canJumpAt;
-		if (far > JUMP.min && !waiting && time >= dizzyUntil) {
-			fixed = want;
-			canJumpAt = time + within(JUMP.rest);
-			// People often blink as their eyes travel far.
-			if (far > JUMP.blinkOver && !still() && chance(0.3)) blink();
+		const waiting = far >= GAZE.jump && time < canJumpAt;
+		// Held while its pupils go round, or for a moment after a jump.
+		if (time >= dizzyUntil && !waiting) {
+			if (far >= GAZE.jump) {
+				fixed = want;
+				canJumpAt = time + within(GAZE.rest);
+				// People often blink as their eyes travel far.
+				if (far > GAZE.blinkOver && !still() && chance(0.3)) blink();
+			} else if (far > GAZE.pursue) fixed = want;
 		}
 		set("lookX", fixed[0]);
 		set("lookY", fixed[1]);

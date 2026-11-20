@@ -1,11 +1,11 @@
 # @tinyhaptic/mascot
 
-The Tiny Haptic mascot: a pair of tall oval eyes, each casting a hard shadow, over a small mouth. It watches the cursor, blinks, gets poked, loses its temper, gets dizzy and falls asleep. One copy for the website and the accounting app.
+The Tiny Haptic mascot: a pair of tall oval eyes, each casting a hard shadow, over a small mouth. It follows the cursor with its eyes, blinks, gets poked, loses its temper, gets dizzy and falls asleep. One copy for the website and the accounting app.
 
 Public so the apps can install it without tokens; not open source (see [LICENSE](LICENSE)).
 
 ```bash
-bun add github:tinyhaptic/mascot#v1.2.3
+bun add github:tinyhaptic/mascot#v1.2.4
 ```
 
 ## Serve its files
@@ -81,5 +81,5 @@ The PNGs need `rsvg-convert` (`brew install librsvg`).
 Installs from GitHub don't build, so `mascot.riv`, `dist/` and `mascot.css` are committed. A pre-commit hook (lefthook, installed by `bun install`) rebuilds them when their sources change. Then:
 
 1. `bun run check`.
-2. Bump `version` in package.json, commit, `git tag v1.2.4 && git push && git push --tags`.
-3. In each app: `bun add github:tinyhaptic/mascot#v1.2.4` (its postinstall writes the new files), and `bunx mascot icons public` if the face changed (the website with `--brand`).
+2. Bump `version` in package.json, commit, `git tag v1.2.5 && git push && git push --tags`.
+3. In each app: `bun add github:tinyhaptic/mascot#v1.2.5` (its postinstall writes the new files), and `bunx mascot icons public` if the face changed (the website with `--brand`).
