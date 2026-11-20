@@ -5,7 +5,7 @@ The Tiny Haptic mascot: a pair of tall oval eyes, each casting a hard shadow, ov
 Public so the apps can install it without tokens; not open source (see [LICENSE](LICENSE)).
 
 ```bash
-bun add github:tinyhaptic/mascot#v1.2.1
+bun add github:tinyhaptic/mascot#v1.2.2
 ```
 
 ## Serve its files
@@ -57,6 +57,7 @@ stop(); // stops it, and takes away a mascot it drew
 - The outline and mouth take the text colour; the eyes, pupils and shadows keep theirs.
 - The theme is `data-theme="dark"` on `<html>`. Its pupils open wider in the dark.
 - `pokeColor` / `zColor` (`colors: { poke, z }` in `mount`) colour the lines of a poke and the z's it sleeps with: any CSS colour, `var(--x)` too. By default, its outline colour, faded.
+- Hovering it gets its attention. To count a larger area (say, the link holding it and a name), mark that area with `data-mascot-host`.
 - `assets` serves the files from somewhere else.
 - What flies off it is drawn on a canvas five times its size, centred on it, so leave it room (no `overflow: hidden` close around it).
 
@@ -80,5 +81,5 @@ The PNGs need `rsvg-convert` (`brew install librsvg`).
 Installs from GitHub don't build, so `mascot.riv`, `dist/` and `mascot.css` are committed. A pre-commit hook (lefthook, installed by `bun install`) rebuilds them when their sources change. Then:
 
 1. `bun run check`.
-2. Bump `version` in package.json, commit, `git tag v1.2.2 && git push && git push --tags`.
-3. In each app: `bun add github:tinyhaptic/mascot#v1.2.2` (its postinstall writes the new files), and `bunx mascot icons public` if the face changed (the website with `--brand`).
+2. Bump `version` in package.json, commit, `git tag v1.2.3 && git push && git push --tags`.
+3. In each app: `bun add github:tinyhaptic/mascot#v1.2.3` (its postinstall writes the new files), and `bunx mascot icons public` if the face changed (the website with `--brand`).

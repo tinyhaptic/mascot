@@ -352,7 +352,7 @@ export function enliven(
 	let pokedAt = 0; // when it was last clicked
 	let target: Element | undefined; // a link or button that has its attention
 	let scanningUntil = 0; // while it is looking around after the lights go out
-	const host = root.closest(".group") ?? root;
+	const host = root.closest("[data-mascot-host]") ?? root; // what counts as hovering it
 	set("face", face);
 	set("dark", !bright());
 
