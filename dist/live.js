@@ -23,6 +23,8 @@
  *   flinches shut, peeks out squinting, then relaxes. Lights off: its eyes go
  *   wide and it looks left and right before settling. Its pupils are larger
  *   in the dark, overshooting for a moment when the theme changes.
+ * - Select some text and it follows the end you are dragging, then reads it,
+ *   line by line, and looks back up at you. Copy it and it gives a little start.
  * - Every change of face gives it a little squash and stretch.
  * - Whirl the cursor around it and it gets dizzy, pupils going round.
  * - After a long while with nothing happening it yawns and dozes; left alone
@@ -99,6 +101,18 @@ const SLEEP = { after: 9000, yawn: 1700 }; // ms dozing before it is fast asleep
 // How it takes the theme changing (ms). Lights on: eyes shut for `flinch`, then squinting until `squint`.
 // Lights off: wide-eyed for `peer`, looking to each side for `scan`.
 const LIGHTS = { flinch: 300, squint: 1300, peer: 1500, scan: 480 };
+// Text being selected: its eyes follow the selecting end. Once the selection has held still
+// for `settle` ms it reads it, line by line: a fixation every `step` px for `fixate` ms (longer
+// at the start of a line), at most `lines` lines and `most` fixations, then skims to the end.
+const READ = {
+    settle: 450,
+    step: 70,
+    fixate: [170, 250],
+    lineStart: [230, 320],
+    lines: 3,
+    most: 18,
+    copied: 650,
+};
 // What it throws onto the page, by default: its outline colour at this opacity.
 const FADE = { poke: 0.55, z: 0.45 };
 // What the page is doing, watched once and shared by every mascot on it.
@@ -109,6 +123,8 @@ const page = {
     onLeave: new Set(), // …to it leaving the page
     onTarget: new Set(), // …to a link or button catching the eye
     onTheme: new Set(), // …to the theme switching
+    onSelect: new Set(), // …to text being selected, or let go
+    onCopy: new Set(), // …to the selection being copied
     noticed: undefined,
     scrolled: { way: 0, until: 0 }, // which way it last scrolled (1 down, -1 up), and until when that holds its eyes
     frame: 0,
@@ -172,6 +188,28 @@ function watchPage() {
         }
         run();
     }, { passive: true });
+    let settle;
+    let pressed = false;
+    const selected = (settled) => {
+        clearTimeout(settle);
+        const now = readSelection(settled);
+        for (const react of page.onSelect)
+            react(now);
+        if (now && !settled && !pressed)
+            settle = window.setTimeout(() => selected(true), READ.settle);
+    };
+    document.addEventListener("selectionchange", () => selected(false));
+    addEventListener("pointerdown", () => (pressed = true), { capture: true });
+    addEventListener("pointerup", () => {
+        pressed = false;
+        if (readSelection(false))
+            selected(false); // let go: start the wait to read it
+    }, { capture: true });
+    addEventListener("pointercancel", () => (pressed = false), { capture: true });
+    document.addEventListener("copy", () => {
+        for (const react of page.onCopy)
+            react();
+    });
     new MutationObserver(() => {
         for (const react of page.onTheme)
             react(document.documentElement.dataset.theme);
@@ -179,6 +217,45 @@ function watchPage() {
         attributes: true,
         attributeFilter: ["data-theme"],
     });
+}
+// The page's selected text, as lines on screen and the end being moved. Nothing for an empty
+// selection, one inside a text field, or one that's off screen.
+function readSelection(settled) {
+    const selection = getSelection();
+    if (!selection || selection.isCollapsed || !selection.rangeCount)
+        return;
+    if (document.activeElement?.matches("input, textarea"))
+        return;
+    if (!selection.toString().trim())
+        return;
+    const lines = [];
+    const boxes = [...selection.getRangeAt(0).getClientRects()]
+        .filter((box) => box.width > 1 && box.height > 1)
+        .sort((a, b) => a.top - b.top || a.left - b.left);
+    for (const box of boxes) {
+        const y = box.top + box.height / 2;
+        const line = lines.find((l) => Math.abs(l.y - y) < box.height / 2);
+        if (line) {
+            line.left = Math.min(line.left, box.left);
+            line.right = Math.max(line.right, box.right);
+        }
+        else
+            lines.push({ left: box.left, right: box.right, y });
+    }
+    const seen = lines.filter((l) => l.y > 0 && l.y < innerHeight);
+    if (!seen.length)
+        return;
+    // Where the selecting end is: a caret at the focus, or failing that the last line's end.
+    let focus;
+    if (selection.focusNode) {
+        const caret = document.createRange();
+        caret.setStart(selection.focusNode, selection.focusOffset);
+        const box = caret.getBoundingClientRect();
+        if (box.height)
+            focus = { x: box.left, y: box.top + box.height / 2 };
+    }
+    const last = seen[seen.length - 1];
+    return { lines: seen, focus: focus ?? { x: last.right, y: last.y }, settled };
 }
 // Any CSS colour as [alpha, red, green, blue], by painting it.
 let pen;
@@ -615,7 +692,79 @@ export function enliven(root, { mood, colors: inks = {}, assets = `/mascot/${VER
             run();
         }, LIGHTS.peer);
     };
+    // Text selected: it follows the selecting end, then reads what was picked out.
+    let reading = 0; // which selection it is on, so an old read stops when a new one starts
+    let selecting = false;
+    const onSelect = (selected) => {
+        const read = ++reading;
+        const now = performance.now();
+        if (!selected) {
+            if (!selecting)
+                return;
+            selecting = false;
+            scanningUntil = 0;
+            watching = page.cursor ? "cursor" : "you";
+            if (!held)
+                rest();
+            run();
+            return;
+        }
+        selecting = true;
+        moved = now;
+        wake();
+        if (!selected.settled || still()) {
+            watching = { ...selected.focus };
+            scanningUntil = now + READ.settle;
+            if (!held)
+                show("curious");
+            run();
+            return;
+        }
+        // Reading: along each line in short fixations, back to the start of the next.
+        const plan = [];
+        for (const line of selected.lines.slice(0, READ.lines)) {
+            const across = Math.max(1, Math.round((line.right - line.left) / READ.step));
+            for (let i = 0; i < across; i++) {
+                const x = line.left + ((i + 0.5) / across) * (line.right - line.left);
+                plan.push([{ x, y: line.y }, within(i ? READ.fixate : READ.lineStart)]);
+            }
+        }
+        plan.splice(READ.most);
+        const last = selected.lines[selected.lines.length - 1];
+        if (selected.lines.length > READ.lines || plan.length === READ.most)
+            plan.push([{ x: last.right, y: last.y }, within(READ.lineStart)]); // …skims to the end
+        const takes = plan.reduce((sum, [, ms]) => sum + ms, 0);
+        scanningUntil = now + takes;
+        hold("curious", takes + 300);
+        let at = 0;
+        for (const [spot, ms] of plan) {
+            later(() => {
+                if (reading !== read)
+                    return;
+                watching = spot;
+                run();
+            }, at);
+            at += ms;
+        }
+        later(() => {
+            if (reading !== read)
+                return;
+            watching = "you"; // done: looks back up at you
+            if (selected.lines.length > 1 && !still())
+                blink(BLINK.slow);
+            run();
+        }, at);
+    };
+    // Copied: a little start, as if to say "got it".
+    const onCopy = () => {
+        if (!selecting)
+            return;
+        blink();
+        hold("surprised", READ.copied);
+    };
     page.onMove.add(onMove);
+    page.onSelect.add(onSelect);
+    page.onCopy.add(onCopy);
     page.onLeave.add(onLeave);
     page.onTarget.add(onTarget);
     page.onTheme.add(onTheme);
@@ -684,6 +833,8 @@ export function enliven(root, { mood, colors: inks = {}, assets = `/mascot/${VER
         page.onLeave.delete(onLeave);
         page.onTarget.delete(onTarget);
         page.onTheme.delete(onTheme);
+        page.onSelect.delete(onSelect);
+        page.onCopy.delete(onCopy);
         resized?.disconnect();
         rive?.cleanup();
         root.removeAttribute("data-live");
