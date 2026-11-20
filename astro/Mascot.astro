@@ -4,7 +4,7 @@
  * live mascot takes over in the browser. Size it and colour its outline with
  * `class`; the eyes, pupils and shadows keep their colours on any theme.
  */
-import { mascotSvg, type Face } from "../dist/index.js";
+import { mascotSvg, type Face } from "@tinyhaptic/mascot";
 import "../mascot.css";
 
 interface Props {
@@ -42,7 +42,8 @@ const inner =
 />
 
 <script>
-  import { enliven } from "../dist/index.js";
+  // By its own name, so bundlers treat it as a dependency (Vite pre-bundles it, and Rive's CommonJS runtime with it).
+  import { enliven } from "@tinyhaptic/mascot";
 
   const alive = new WeakSet<Element>();
   const wake = () => {
