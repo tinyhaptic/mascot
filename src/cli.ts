@@ -1,23 +1,37 @@
 #!/usr/bin/env node
 /**
- * Writes the static copies of the mascot into a site's public folder:
+ * Writes the mascot's files into a site's public folder:
  *
+ *   mascot assets <dir>          mascot/<version>/{mascot.riv,rive.wasm}, what the
+ *                                live mascot loads (and removes older versions)
  *   mascot icons <dir>           favicon.svg and apple-touch-icon.png
  *   mascot icons <dir> --brand   and brand/tinyhaptic-icon-{dark,light}.png (1024px)
  *
  * The PNGs need `rsvg-convert` (macOS: brew install librsvg).
  */
 import { spawnSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import {
+	copyFileSync,
+	mkdirSync,
+	readdirSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { favicon, icon } from "./icons.js";
+import { VERSION } from "./version.js";
 
 const [command, dir, ...flags] = process.argv.slice(2);
-if (command !== "icons" || !dir) {
-	console.error("Usage: mascot icons <public dir> [--brand]");
+const usage = () => {
+	console.error(
+		"Usage: mascot assets <public dir>\n       mascot icons <public dir> [--brand]",
+	);
 	process.exit(1);
-}
+};
+if (!dir) usage();
 
 const write = (path: string, data: string | Uint8Array) => {
 	const to = join(dir, path);
@@ -42,10 +56,28 @@ const png = (src: string, size: number) => {
 	return out.stdout;
 };
 
-write("favicon.svg", favicon());
-write("apple-touch-icon.png", png(icon("dark"), 180));
-if (flags.includes("--brand")) {
-	for (const tone of ["dark", "light"] as const) {
-		write(`brand/tinyhaptic-icon-${tone}.png`, png(icon(tone), 1024));
+if (command === "assets") {
+	// Each version in its own folder, so the files can be cached for good.
+	const root = join(dir, "mascot");
+	const to = join(root, VERSION);
+	mkdirSync(to, { recursive: true });
+	for (const old of readdirSync(root)) {
+		if (old !== VERSION)
+			rmSync(join(root, old), { recursive: true, force: true });
 	}
-}
+	const riv = fileURLToPath(new URL("../mascot.riv", import.meta.url));
+	const wasm = createRequire(import.meta.url).resolve(
+		"@rive-app/webgl2/rive.wasm",
+	);
+	copyFileSync(riv, join(to, "mascot.riv"));
+	copyFileSync(wasm, join(to, "rive.wasm"));
+	console.log(`Wrote ${to}/mascot.riv and rive.wasm`);
+} else if (command === "icons") {
+	write("favicon.svg", favicon());
+	write("apple-touch-icon.png", png(icon("dark"), 180));
+	if (flags.includes("--brand")) {
+		for (const tone of ["dark", "light"] as const) {
+			write(`brand/tinyhaptic-icon-${tone}.png`, png(icon(tone), 1024));
+		}
+	}
+} else usage();

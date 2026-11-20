@@ -1,14 +1,11 @@
 /**
- * Geometry of the Tiny Haptic mascot: a pair of round eyes with round black
- * pupils, over a small mouth, in a 32×32 viewBox.
+ * Geometry of the Tiny Haptic mascot: a pair of tall oval eyes, each casting a
+ * hard shadow to one side so it reads as a thick disc standing off the page,
+ * over a small mouth, in a 32×32 viewBox.
  *
  * A face is a `Pose`: a handful of numbers. `shapes` turns a pose into path
- * data, so any two faces can be blended by blending their numbers. That is how
- * the live mascot (`enliven` in ./live.ts) moves smoothly from one face to the next.
- *
- * After changing anything here, tag a new version, bump it in the website and
- * the app, and run the website's `bun scripts/mascot-assets.ts` to redraw the
- * favicon and brand files.
+ * data. scripts/rive.ts builds the live mascot (mascot.riv) from the same
+ * poses, so the drawing and the live one always match.
  */
 type Point = {
     x: number;
@@ -54,13 +51,13 @@ export type Pose = {
     pupils: [Point, Point];
     mouth: Mouth;
 };
-export type Face = "hi" | "blink" | "surprised" | "sad" | "skeptical" | "sleepy" | "curious" | "dazzled" | "annoyed" | "peering" | "lost" | "furious" | "dizzy" | "asleep" | "dead";
+export type Face = "hi" | "blink" | "surprised" | "sad" | "skeptical" | "sleepy" | "curious" | "dazzled" | "annoyed" | "peering" | "lost" | "furious" | "dizzy" | "asleep" | "dead" | "yawn";
 /** Where the eyes sit and how big they are. */
 export type Eyes = {
     /** Centre x of each eye, and the centre y they share. */
     at: readonly [number, number];
     cy: number;
-    /** The open eye: an oval (drawn as a circle). */
+    /** The open eye: an oval. */
     eye: {
         rx: number;
         ry: number;
@@ -73,7 +70,9 @@ export type Eyes = {
     };
     /** How far a pupil can travel from where it rests. */
     reach: Point;
-    /** Centre x of the mouth: under the middle of the eyes. */
+    /** How far each eye's shadow is offset behind it. */
+    depth: Point;
+    /** Centre x of the mouth: under the middle of the eyes and their shadows together. */
     mouth: number;
 };
 export declare const EYES: Eyes;
@@ -82,6 +81,7 @@ export declare const EYES: Eyes;
 export declare const COLOR: {
     readonly eye: "#ffffff";
     readonly pupil: "#0a0a0a";
+    readonly shadow: "#8a8a8a";
     readonly rage: "#ff3b30";
 };
 export declare const poses: Record<Face, Pose>;
@@ -116,18 +116,8 @@ export declare function portrait(pose: Pose, line: string, id?: string): string;
 export declare function markup(face: Face, line: string): string;
 /**
  * A bolder cut of the mascot for tiny sizes (favicon, app icons): only the
- * eyes, bigger, looking a little down, with a heavier line, centred in the box.
+ * eyes, bigger, looking down and to the right, with a heavier line and a
+ * deeper shadow, eyes and shadow centred together in the box.
  */
 export declare function emblem(line: string): string;
-/**
- * A pose as a flat list of numbers, for blending, and back. `AT` says where
- * things sit in the list: the four pupil offsets (x, y, x, y) start at
- * `AT.pupils`.
- */
-export declare const AT: {
-    readonly open: 0;
-    readonly pupils: 7;
-};
-export declare const flatten: ({ open, lid, cheek, tilt, size, pupil: p, pupils: [a, b], mouth: m, }: Pose) => number[];
-export declare const unflatten: (v: number[]) => Pose;
 export {};

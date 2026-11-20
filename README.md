@@ -1,14 +1,31 @@
 # @tinyhaptic/mascot
 
-The Tiny Haptic mascot: a pair of round eyes over a small mouth. One copy for the website and the accounting app.
+The Tiny Haptic mascot: a pair of tall oval eyes, each casting a hard shadow, over a small mouth. It watches the cursor, blinks, gets poked, loses its temper, gets dizzy and falls asleep. One copy for the website and the accounting app.
+
+Public so the apps can install it without tokens; not open source (see [LICENSE](LICENSE)).
 
 ```bash
-bun add github:tinyhaptic/mascot#v1.1.0
+bun add github:tinyhaptic/mascot#v1.2.0
 ```
+
+## Serve its files
+
+The live mascot is a Rive file played by Rive's WebAssembly runtime. Both are served from your site, at `/mascot/<version>/`, which can be cached for good. Write them on every install and keep them out of git:
+
+```jsonc
+// package.json
+"scripts": { "postinstall": "mascot assets public" }
+```
+
+```gitignore
+public/mascot/
+```
+
+Until they load (or if they can't), the mascot is a drawing of the same face.
 
 ## Use it
 
-React 19 (renders on the server, comes alive in the browser; its styles come with it):
+React 19 (drawn on the server, alive in the browser; its styles come with it):
 
 ```tsx
 import { Mascot } from "@tinyhaptic/mascot/react";
@@ -33,13 +50,17 @@ Anything else:
 import { mount, mascotHtml } from "@tinyhaptic/mascot";
 
 const stop = mount(document.querySelector("#logo"), { className: "size-8" }); // draws one in, alive
-mount(document.querySelector("svg.mascot")); // or brings one drawn by mascotHtml() to life
+mount(document.querySelector(".mascot")); // or brings one drawn by mascotHtml() to life
 stop(); // stops it, and takes away a mascot it drew
 ```
 
-The outline and mouth take the text colour; the eyes and pupils keep theirs. The theme is `data-theme="dark"` on `<html>`. `pokeColor` / `zColor` (`colors: { poke, z }` in `mount`) colour what it throws onto the page.
+- The outline and mouth take the text colour; the eyes, pupils and shadows keep theirs.
+- The theme is `data-theme="dark"` on `<html>`. Its pupils open wider in the dark.
+- `pokeColor` / `zColor` (`colors: { poke, z }` in `mount`) colour the lines of a poke and the z's it sleeps with: any CSS colour, `var(--x)` too. By default, its outline colour, faded.
+- `assets` serves the files from somewhere else.
+- What flies off it is drawn on a canvas five times its size, centred on it, so leave it room (no `overflow: hidden` close around it).
 
-Also exported: `markup`, `portrait`, `emblem`, `poses`, `shapes` (the geometry, for images), `favicon()` and `icon()` (SVG strings), and `css` (also as `@tinyhaptic/mascot/mascot.css`).
+Also exported: `markup`, `portrait`, `emblem`, `poses`, `shapes` (the geometry, for images), `favicon()` and `icon()` (SVG strings), `css` (also as `@tinyhaptic/mascot/mascot.css`) and `VERSION`.
 
 ## Icons
 
@@ -52,6 +73,12 @@ The PNGs need `rsvg-convert` (`brew install librsvg`).
 
 ## Change it
 
-1. Edit `src/` (styles in `src/css.ts`), then `bun run check && bun run build`. `dist/` and `mascot.css` are committed: installs from GitHub don't build.
-2. Bump `version` in package.json, commit, `git tag v1.2.0 && git push && git push --tags`.
-3. In each project: `bun add github:tinyhaptic/mascot#v1.2.0`, then `bunx mascot icons public` (the website with `--brand`).
+- The face: `src/mascot.ts` (poses and geometry). The live mascot is built from it by `scripts/rive.ts` into `mascot.riv`, with the [Rive CLI](https://rive.app/docs/cli) (`brew install --cask rive-cli`). Preview it with `rive rive/mascot`.
+- What it does: `src/live.ts`, which drives the Rive file's view model.
+- Styles: `src/css.ts`.
+
+Installs from GitHub don't build, so `mascot.riv`, `dist/` and `mascot.css` are committed. A pre-commit hook (lefthook, installed by `bun install`) rebuilds them when their sources change. Then:
+
+1. `bun run check`.
+2. Bump `version` in package.json, commit, `git tag v1.2.1 && git push && git push --tags`.
+3. In each app: `bun add github:tinyhaptic/mascot#v1.2.1` (its postinstall writes the new files), and `bunx mascot icons public` if the face changed (the website with `--brand`).

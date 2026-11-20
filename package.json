@@ -1,15 +1,17 @@
 {
 	"name": "@tinyhaptic/mascot",
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"private": true,
-	"description": "The Tiny Haptic mascot: a plain JavaScript core, React and Astro components, and its icons.",
+	"description": "The Tiny Haptic mascot: a live Rive mascot with React and Astro components, its drawing and its icons.",
+	"license": "UNLICENSED",
 	"bin": {
 		"mascot": "./dist/cli.js"
 	},
 	"files": [
 		"dist",
 		"astro",
-		"mascot.css"
+		"mascot.css",
+		"mascot.riv"
 	],
 	"type": "module",
 	"sideEffects": [
@@ -28,13 +30,20 @@
 		"./mascot.css": "./mascot.css"
 	},
 	"scripts": {
-		"build": "rm -rf dist && tsc -p tsconfig.json && bun -e 'import { css } from \"./dist/css.js\"; await Bun.write(\"mascot.css\", `/* Written by the build from src/css.ts. */\\n${css}`)' && chmod +x dist/cli.js",
+		"build": "rm -rf dist && bun -e 'const { version } = await Bun.file(\"package.json\").json(); await Bun.write(\"src/version.ts\", `/** Written by the build from package.json. */\\nexport const VERSION = \"${version}\";\\n`)' && tsc -p tsconfig.json && bun -e 'import { css } from \"./dist/css.js\"; await Bun.write(\"mascot.css\", `/* Written by the build from src/css.ts. */\\n${css}`)' && chmod +x dist/cli.js",
+		"rive": "bun scripts/rive.ts",
 		"check": "tsc -p tsconfig.json --noEmit && oxfmt --check && oxlint",
-		"format": "oxfmt"
+		"format": "oxfmt",
+		"prepare": "lefthook install"
+	},
+	"dependencies": {
+		"@rive-app/webgl2": "2.49.4"
 	},
 	"devDependencies": {
+		"@types/bun": "1.4.4",
 		"@types/node": "24.19.2",
 		"@types/react": "19.3.0",
+		"lefthook": "2.2.2",
 		"oxfmt": "0.79.0",
 		"oxlint": "1.94.0",
 		"oxlint-tsgolint": "7.0.2007",

@@ -1,65 +1,40 @@
 /**
- * The mascot's styles: its poke, rage, knocked-out and breathing animations,
- * and the spirals hidden until it is knocked out. `mount` adds them to the
- * page once; `mascot.css` is the same text, written by the build.
+ * The mascot's styles. `mount` adds them to the page once; `mascot.css` is the
+ * same text, written by the build.
  */
 export const css = `
 .mascot {
-	overflow: visible;
+	position: relative;
+	display: inline-block;
+	vertical-align: middle;
 }
 .mascot[data-alive] {
 	cursor: pointer;
 }
-/* Knocked out, a spiral grows in each eye as the pupils shrink away, and keeps turning. */
-.mascot [data-part="spirals"] path {
-	transition:
-		opacity 160ms linear,
-		scale 260ms cubic-bezier(0.3, 1.5, 0.6, 1);
-	animation: mascot-spin 1100ms linear infinite;
+.mascot > svg {
+	display: block;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
 }
-.mascot:not(.dead) [data-part="spirals"] path {
-	opacity: 0;
-	scale: 0.2;
-	animation-play-state: paused;
+.mascot > svg:not(.dead) [data-part="spirals"] {
+	display: none;
 }
-@keyframes mascot-spin {
-	to { rotate: -360deg; }
+/* The live mascot. Five times its size, for what flies off it. */
+.mascot > canvas {
+	position: absolute;
+	z-index: 10;
+	inset: -200%;
+	width: 500%;
+	height: 500%;
+	pointer-events: none;
+	visibility: hidden;
 }
-/* Breathing. The script turns the head with \`transform\`; this uses \`translate\`, so both apply. */
-.mascot[data-alive] [data-part="head"] {
-	animation: mascot-breathe 4200ms ease-in-out infinite;
+/* Once the live mascot has drawn, it takes over from the drawing. */
+.mascot[data-live] > svg {
+	visibility: hidden;
 }
-@keyframes mascot-breathe {
-	50% { translate: 0 0.3px; }
-}
-.mascot.wiggle {
-	animation: mascot-wiggle 420ms ease-in-out;
-}
-@keyframes mascot-wiggle {
-	/* Squashed by the poke, then springing back with a wobble. */
-	12% { scale: 0.86; rotate: -4deg; }
-	30% { scale: 1.08; rotate: -9deg; }
-	50% { scale: 0.98; rotate: 7deg; }
-	72% { scale: 1.01; rotate: -4deg; }
-	100% { scale: 1; rotate: 0deg; }
-}
-.mascot.rage {
-	animation: mascot-rage 380ms linear;
-}
-@keyframes mascot-rage {
-	10% { translate: -1.5px 0.5px; rotate: -3deg; }
-	25% { translate: 1.5px -0.5px; rotate: 3deg; }
-	40% { translate: -1.5px -0.5px; rotate: -2deg; }
-	55% { translate: 1.5px 0.5px; rotate: 2deg; }
-	70% { translate: -1px 0; rotate: -1deg; }
-	85% { translate: 1px 0; rotate: 1deg; }
-}
-@media (prefers-reduced-motion: reduce) {
-	.mascot.rage,
-	.mascot.wiggle,
-	.mascot [data-part="spirals"] path,
-	.mascot[data-alive] [data-part="head"] {
-		animation: none;
-	}
+.mascot[data-live] > canvas {
+	visibility: visible;
 }
 `.trimStart();

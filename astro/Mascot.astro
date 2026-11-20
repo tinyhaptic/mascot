@@ -1,8 +1,8 @@
 ---
 /**
- * The Tiny Haptic mascot for Astro. Drawn on the server, brought to life by
- * the script below (only when `alive`). Size it and colour its outline with
- * `class`; the eyes and pupils keep their colours on any theme.
+ * The Tiny Haptic mascot for Astro. Drawn on the server; with `alive`, the
+ * live mascot takes over in the browser. Size it and colour its outline with
+ * `class`; the eyes, pupils and shadows keep their colours on any theme.
  */
 import { mascotSvg, type Face } from "../dist/index.js";
 import "../mascot.css";
@@ -14,36 +14,49 @@ interface Props {
   face?: Face;
   /** A standing mood that replaces its resting calm: "lost" for a 404 page. */
   mood?: "lost";
-  /** Colours for the lines of a poke and the z's it sleeps with. Any CSS colour. */
+  /** Colours for the lines of a poke and the z's it sleeps with. Any CSS colour, `var(--x)` too. */
   pokeColor?: string;
   zColor?: string;
+  /** Where mascot.riv and rive.wasm are served from. Default `/mascot/<version>/`. */
+  assets?: string;
   [attr: `data-${string}`]: string | boolean | undefined;
 }
 
-const { class: className, face, alive = false, mood, pokeColor, zColor, ...rest } = Astro.props;
+const { class: className, face, alive = false, mood, pokeColor, zColor, assets, ...rest } = Astro.props;
 const shown = face ?? mood ?? "hi";
 const id = `mascot-${crypto.randomUUID().slice(0, 8)}`;
+const inner =
+  `<svg viewBox="0 0 32 32" aria-hidden="true"${shown === "dead" ? ` class="dead"` : ""}>${mascotSvg({ face: shown, id })}</svg>` +
+  (alive ? `<canvas aria-hidden="true"></canvas>` : "");
 ---
 
-<svg
-  viewBox="0 0 32 32"
-  aria-hidden="true"
-  class:list={["mascot", shown === "dead" && "dead", className]}
+<span
+  class:list={["mascot", className]}
   data-alive={alive || undefined}
   data-mood={mood}
   data-poke={pokeColor}
   data-z={zColor}
+  data-assets={assets}
   {...rest}
-  set:html={mascotSvg({ face: shown, id })}
+  set:html={inner}
 />
 
 <script>
-  import { mount } from "../dist/index.js";
+  import { enliven } from "../dist/index.js";
 
-  for (const svg of document.querySelectorAll<SVGSVGElement>("svg.mascot[data-alive]")) {
-    mount(svg, {
-      mood: svg.dataset.mood === "lost" ? "lost" : undefined,
-      colors: { poke: svg.dataset.poke, z: svg.dataset.z },
-    });
-  }
+  const alive = new WeakSet<Element>();
+  const wake = () => {
+    for (const root of document.querySelectorAll<HTMLElement>(".mascot[data-alive]")) {
+      if (alive.has(root)) continue;
+      alive.add(root);
+      const { mood, poke, z, assets } = root.dataset;
+      enliven(root, {
+        mood: mood === "lost" ? "lost" : undefined,
+        colors: { poke, z },
+        assets,
+      });
+    }
+  };
+  wake();
+  document.addEventListener("astro:page-load", wake);
 </script>

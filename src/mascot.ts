@@ -1,14 +1,11 @@
 /**
- * Geometry of the Tiny Haptic mascot: a pair of round eyes with round black
- * pupils, over a small mouth, in a 32×32 viewBox.
+ * Geometry of the Tiny Haptic mascot: a pair of tall oval eyes, each casting a
+ * hard shadow to one side so it reads as a thick disc standing off the page,
+ * over a small mouth, in a 32×32 viewBox.
  *
  * A face is a `Pose`: a handful of numbers. `shapes` turns a pose into path
- * data, so any two faces can be blended by blending their numbers. That is how
- * the live mascot (`enliven` in ./live.ts) moves smoothly from one face to the next.
- *
- * After changing anything here, tag a new version, bump it in the website and
- * the app, and run the website's `bun scripts/mascot-assets.ts` to redraw the
- * favicon and brand files.
+ * data. scripts/rive.ts builds the live mascot (mascot.riv) from the same
+ * poses, so the drawing and the live one always match.
  */
 
 type Point = { x: number; y: number };
@@ -67,31 +64,35 @@ export type Face =
 	| "furious"
 	| "dizzy"
 	| "asleep"
-	| "dead";
+	| "dead"
+	| "yawn";
 
 /** Where the eyes sit and how big they are. */
 export type Eyes = {
 	/** Centre x of each eye, and the centre y they share. */
 	at: readonly [number, number];
 	cy: number;
-	/** The open eye: an oval (drawn as a circle). */
+	/** The open eye: an oval. */
 	eye: { rx: number; ry: number };
 	/** The shut eye: a flat bar with round ends, sitting `drop` lower. */
 	shut: { rx: number; ry: number; drop: number };
 	/** How far a pupil can travel from where it rests. */
 	reach: Point;
-	/** Centre x of the mouth: under the middle of the eyes. */
+	/** How far each eye's shadow is offset behind it. */
+	depth: Point;
+	/** Centre x of the mouth: under the middle of the eyes and their shadows together. */
 	mouth: number;
 };
 
-// The pair sits in the middle, the eyes just touching.
+// The pair sits a little left of centre to leave room for the shadow.
 export const EYES: Eyes = {
-	at: [9.3, 22.7],
+	at: [7.9, 22.3],
 	cy: 12.3,
-	eye: { rx: 6.6, ry: 6.6 },
+	eye: { rx: 5.6, ry: 7.4 },
 	shut: { rx: 5.5, ry: 0.5, drop: 1.1 },
 	reach: { x: 2.2, y: 3 },
-	mouth: 16,
+	depth: { x: 2.2, y: 1.5 },
+	mouth: 15.7,
 };
 
 /** Colours that stay the same on light and dark themes. Only the outline follows the theme. */
@@ -99,6 +100,7 @@ export const EYES: Eyes = {
 export const COLOR = {
 	eye: "#ffffff",
 	pupil: "#0a0a0a",
+	shadow: "#8a8a8a",
 	rage: "#ff3b30",
 } as const;
 
@@ -111,6 +113,7 @@ const mouths = {
 	snore: { w: 0.95, upper: -1.15, lower: 1.15, inset: 0, y: 25.7 },
 	scowl: { w: 2.5, upper: -1.1, lower: -1.1, inset: 1.67, y: 26 },
 	gape: { w: 1.25, upper: -1.67, lower: 1.67, inset: 0, y: 25.7 },
+	yawn: { w: 2.7, upper: -4.6, lower: 5.4, inset: 0, y: 25.8 },
 } satisfies Record<string, Mouth>;
 
 const both = (x: number, y: number): [Point, Point] => [
@@ -211,6 +214,15 @@ export const poses: Record<Face, Pose> = {
 		mouth: mouths.gape,
 	},
 	// Half-shut and drooping, smaller pupils tucked under the lid.
+	// About to doze off: eyes screwed shut, mouth stretched wide open.
+	yawn: {
+		...hi,
+		mouth: mouths.yawn,
+		lid: 0.45,
+		cheek: 0.75,
+		tilt: -0.15,
+		pupils: both(0, 1.5),
+	},
 	sleepy: {
 		...hi,
 		mouth: mouths.flat,
@@ -330,6 +342,7 @@ function paint(
 	const stroke = (color: string) =>
 		`stroke="${color}" stroke-linejoin="round" stroke-width="${n(1.3 * weight)}"`;
 	return (
+		`<path d="${s.eye}" transform="translate(${n(eyes.depth.x)} ${n(eyes.depth.y)})" fill="${COLOR.shadow}" ${stroke(COLOR.shadow)}/>` +
 		`<path d="${s.eye}" fill="${COLOR.eye}" ${stroke(line)}/>` +
 		`<path d="${s.pupil}" fill="${COLOR.pupil}"/>` +
 		(withMouth
@@ -348,6 +361,7 @@ export function portrait(pose: Pose, line: string, id = "mascot-eyes") {
 		`stroke="${color}" stroke-linejoin="round" stroke-width="1.3"`;
 	return (
 		`<clipPath id="${id}"><path d="${s.eye}"/></clipPath>` +
+		`<path d="${s.eye}" transform="translate(${EYES.depth.x} ${EYES.depth.y})" fill="${COLOR.shadow}" ${stroke(COLOR.shadow)}/>` +
 		`<path d="${s.eye}" fill="${COLOR.eye}"/>` +
 		`<path d="${s.pupil}" fill="${COLOR.pupil}" clip-path="url(#${id})"/>` +
 		`<path d="${s.eye}" fill="none" ${stroke(line)}/>` +
@@ -373,68 +387,29 @@ export function markup(face: Face, line: string) {
 
 /**
  * A bolder cut of the mascot for tiny sizes (favicon, app icons): only the
- * eyes, bigger, looking a little down, with a heavier line, centred in the box.
+ * eyes, bigger, looking down and to the right, with a heavier line and a
+ * deeper shadow, eyes and shadow centred together in the box.
  */
 export function emblem(line: string) {
 	const SPREAD = 7.75; // each eye's centre, from the middle
 	const GROW = (SPREAD - 1.3) / EYES.eye.rx; // leaves a sliver between the eyes' heavy outlines
+	const DEEP = 1.3; // a thicker shadow, so the depth still shows at tab size
+	const depth = {
+		x: EYES.depth.x * GROW * DEEP,
+		y: EYES.depth.y * GROW * DEEP,
+	};
+	const mx = 16 - depth.x / 2;
 	const bold: Eyes = {
 		...EYES,
-		at: [16 - SPREAD, 16 + SPREAD],
-		cy: 16,
+		depth,
+		at: [mx - SPREAD, mx + SPREAD],
+		cy: 16 - depth.y / 2,
 		eye: { rx: EYES.eye.rx * GROW, ry: EYES.eye.ry * GROW },
 	};
 	const pose: Pose = {
 		...hi,
 		pupil: { rx: hi.pupil.rx * GROW, ry: hi.pupil.ry * GROW },
-		pupils: both(-0.2 * GROW, 0.7 * GROW), // looking a little down, clear of the heavy outline
+		pupils: both(1.05 * GROW, 1.35 * GROW), // looking down and to the right, clear of the heavy outline
 	};
 	return paint(bold, pose, line, 1.5, false);
 }
-
-/**
- * A pose as a flat list of numbers, for blending, and back. `AT` says where
- * things sit in the list: the four pupil offsets (x, y, x, y) start at
- * `AT.pupils`.
- */
-export const AT = { open: 0, pupils: 7 } as const;
-export const flatten = ({
-	open,
-	lid,
-	cheek,
-	tilt,
-	size,
-	pupil: p,
-	pupils: [a, b],
-	mouth: m,
-}: Pose) => [
-	open,
-	lid,
-	cheek,
-	tilt,
-	size,
-	p.rx,
-	p.ry,
-	a.x,
-	a.y,
-	b.x,
-	b.y,
-	m.w,
-	m.upper,
-	m.lower,
-	m.inset,
-	m.y,
-];
-export const unflatten = (v: number[]): Pose => ({
-	open: v[0],
-	lid: v[1],
-	cheek: v[2],
-	tilt: v[3],
-	size: v[4],
-	pupil: { rx: v[5], ry: v[6] },
-	pupils: [
-		{ x: v[7], y: v[8] },
-		{ x: v[9], y: v[10] },
-	],
-	mouth: { w: v[11], upper: v[12], lower: v[13], inset: v[14], y: v[15] },
-});

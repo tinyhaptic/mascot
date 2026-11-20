@@ -1,0 +1,15 @@
+# Git hooks (https://lefthook.dev). Installed by `bun install`.
+pre-commit:
+  jobs:
+    # Installs from GitHub don't build, so what they use is committed: the live mascot (built with
+    # the Rive CLI: `brew install --cask rive-cli`), and dist/ and mascot.css (built with tsc).
+    - name: rive
+      glob:
+        - src/mascot.ts
+        - scripts/rive.ts
+      run: bun run rive && git add mascot.riv rive/mascot/scene.rml
+    - name: build
+      glob:
+        - src/**
+        - package.json
+      run: bun run build && git add dist mascot.css src/version.ts

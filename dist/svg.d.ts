@@ -6,13 +6,10 @@ export type MascotSvgOptions = {
     id: string;
 };
 /**
- * The inside of a mascot's `<svg viewBox="0 0 32 32" class="mascot">`: the
- * parts `enliven` animates (head, eye, pupil, mouth) and the spirals a
- * knocked-out mascot shows. The eyes and pupils keep their colours on light
- * and dark themes; the outline and mouth take currentColor.
- *
- * Wrappers put it in their own `<svg>` (React: `dangerouslySetInnerHTML`,
- * Astro: `set:html`), with the class `mascot`, `data-alive` when it is to be
- * enlivened, and `dead` while the face is "dead".
+ * The inside of a mascot's `<svg viewBox="0 0 32 32">`: the eyes, each with
+ * its shadow, the pupils, the mouth, and the spirals a knocked-out mascot
+ * shows (hidden unless the svg has the class `dead`). The eyes, pupils and
+ * shadows keep their colours on light and dark themes; the outline and mouth
+ * take currentColor.
  */
 export declare function mascotSvg({ face, id }: MascotSvgOptions): string;
