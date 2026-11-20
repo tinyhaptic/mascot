@@ -53,5 +53,5 @@ The PNGs need `rsvg-convert` (`brew install librsvg`).
 ## Change it
 
 1. Edit `src/` (styles in `src/css.ts`), then `bun run check && bun run build`. `dist/` and `mascot.css` are committed: installs from GitHub don't build.
-2. Bump `version` in package.json, commit, `git tag v1.2.0 && git push --follow-tags`.
+2. Bump `version` in package.json, commit, `git tag v1.2.0 && git push && git push --tags`.
 3. In each project: `bun add github:tinyhaptic/mascot#v1.2.0`, then `bunx mascot icons public` (the website with `--brand`).
