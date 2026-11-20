@@ -25,6 +25,15 @@
  *   in the dark, overshooting for a moment when the theme changes.
  * - Select some text and it follows the end you are dragging, then reads it,
  *   line by line, and looks back up at you. Copy it and it gives a little start.
+ * - Now and then, left to itself, it pulls a face: a cheeky wink with its
+ *   tongue out, a side-eye, a smug look, an innocent whistle (notes drifting
+ *   off), a sneeze (ah… ah… choo, with a spray), or, rarely, cross-eyed or
+ *   derpy. Rest the cursor on its nose and it goes cross-eyed looking at it.
+ *   It eyes a destructive button sideways (`data-variant="destructive"`); any
+ *   link or button can name its own face with `data-mascot-face`. While
+ *   something on the page is `aria-busy="true"` it concentrates, tongue out.
+ *   Copying gets a smug "got it"; knocked out, it comes round whistling; the
+ *   lights coming on sometimes make it sneeze.
  * - Every change of face gives it a little squash and stretch.
  * - Whirl the cursor around it and it gets dizzy, pupils going round.
  * - After a long while with nothing happening it yawns and dozes; left alone
@@ -34,7 +43,7 @@
  * all around, quick blinks, and only a moment's attention for the cursor.
  * Reduced motion keeps only the gaze and the reactions to hover and click.
  */
-import { COLOR, EYES, poses } from "./mascot.js";
+import { COLOR, EYES, gazeOf, poses } from "./mascot.js";
 import { VERSION } from "./version.js";
 const rand = (min, max) => min + Math.random() * (max - min);
 const chance = (p) => Math.random() < p;
@@ -93,6 +102,7 @@ const TEMPER = {
     glare: 1800,
     rage: 2600,
     out: 3600,
+    whistle: 2400,
 };
 // Dizzy: the cursor going this many times round it, within this long (ms), no closer than `near`
 // and no farther than `far` (in mascot widths). The pupils then go round for `ms`.
@@ -112,7 +122,32 @@ const READ = {
     lines: 3,
     most: 18,
     copied: 650,
+    smug: 1100,
 };
+// Now and then, when nothing needs its attention, it pulls a face: this often (a share of its idle
+// moments), picked by weight, each held this long (ms).
+const EMOTE = {
+    chance: 0.07,
+    faces: [
+        ["cheeky", 3, 1400],
+        ["sideeye", 3, 1600],
+        ["smug", 2, 1500],
+        ["whistle", 2, 2600],
+        ["sneeze", 1.5, 0],
+        ["crosseyed", 0.6, 1100],
+        ["derp", 0.4, 1500],
+    ],
+};
+// A sneeze: it builds (a sniff at `sniff` ms), then out it comes at `out`, and is over by `done`.
+const SNEEZE = { sniff: 380, out: 820, done: 1350, lights: 0.3 };
+// The cursor held still on its nose this long (ms) makes it go cross-eyed, within this far of the
+// middle of its face (face units).
+const NOSE = { ms: 650, near: 6.5, at: { x: 15.4, y: 18 } };
+// Something on the page is busy (`aria-busy="true"`): it concentrates, tongue out, until it is done.
+const BUSY = "[aria-busy='true']";
+// What it makes of a link or button it looks at: its own `data-mascot-face`, side-eye for a
+// destructive one, otherwise interest.
+const WARY = "[data-variant='destructive'], .destructive";
 // Sparks: how many bursts the file has, and how soon (ms) a poke can throw another.
 const SPARKS = { bursts: 4, apart: 180 };
 // What it throws onto the page, by default: its outline colour at this opacity.
@@ -369,10 +404,10 @@ export function enliven(root, { mood, colors: inks = {}, assets = `/mascot/${VER
         .catch(() => { }); // no live mascot: the drawing stays
     const lost = mood === "lost";
     let face = lost ? "lost" : "hi";
-    const restOf = (name) => [
-        poses[name].pupils[0].x,
-        poses[name].pupils[0].y,
-    ];
+    const restOf = (name) => {
+        const gaze = gazeOf(poses[name]);
+        return [gaze.x, gaze.y];
+    };
     let fixed = restOf(face); // where its eyes are resting between jumps
     let watching = "you";
     let canJumpAt = 0;
@@ -396,6 +431,8 @@ export function enliven(root, { mood, colors: inks = {}, assets = `/mascot/${VER
     let pokedAt = 0; // when it was last clicked
     let target; // a link or button that has its attention
     let scanningUntil = 0; // while it is looking around after the lights go out
+    let busy = false; // something on the page is working (aria-busy)
+    let crossed = false; // the cursor is resting on its nose
     const host = root.closest("[data-mascot-host]") ?? root; // what counts as hovering it
     set("face", face);
     set("dark", !bright());
@@ -481,17 +518,31 @@ export function enliven(root, { mood, colors: inks = {}, assets = `/mascot/${VER
             fire("pop"); // a little squash and stretch
         face = name;
         set("face", name);
+        set("whistle", name === "whistle" && !still()); // the notes drift off while it whistles
         run();
     };
-    const rest = () => show(hovered || target
-        ? "curious"
-        : asleep
-            ? "asleep"
-            : dozing
-                ? "sleepy"
-                : lost
-                    ? "lost"
-                    : "hi");
+    // The face a link or button gets: its own, side-eye for a destructive one, or interest.
+    const faceFor = (el) => {
+        const own = el.closest("[data-mascot-face]")?.dataset.mascotFace;
+        if (own && own in poses)
+            return own;
+        return el.matches(WARY) ? "sideeye" : "curious";
+    };
+    const rest = () => show(hovered && crossed
+        ? "crosseyed"
+        : target
+            ? faceFor(target)
+            : hovered
+                ? "curious"
+                : asleep
+                    ? "asleep"
+                    : dozing
+                        ? "sleepy"
+                        : lost
+                            ? "lost"
+                            : busy
+                                ? "focused"
+                                : "hi");
     const hold = (name, ms) => {
         show(name);
         if (held)
@@ -530,6 +581,32 @@ export function enliven(root, { mood, colors: inks = {}, assets = `/mascot/${VER
         burstAt = now;
         fire(`spark${(burst++ % SPARKS.bursts) + 1}`);
     };
+    // Ah… ah… choo: it screws up its face, sniffs, then out it comes with a jolt and a spray.
+    const sneeze = () => {
+        if (still())
+            return;
+        hold("sneeze", SNEEZE.done);
+        later(() => fire("pop"), SNEEZE.sniff);
+        later(() => {
+            if (face !== "sneeze")
+                return; // interrupted
+            show("achoo");
+            fire("wiggle");
+            const box = root.getBoundingClientRect();
+            impact(box.left + (EYES.mouth / 32) * box.width, box.top + (27 / 32) * box.height, false);
+        }, SNEEZE.out);
+    };
+    // Pulls one of its faces, picked by weight.
+    const emote = () => {
+        const total = EMOTE.faces.reduce((sum, [, weight]) => sum + weight, 0);
+        let roll = rand(0, total);
+        const [name, , ms] = EMOTE.faces.find(([, weight]) => (roll -= weight) < 0) ?? EMOTE.faces[0];
+        watching = "you";
+        if (name === "sneeze")
+            sneeze();
+        else
+            hold(name, ms);
+    };
     // Somewhere on the page, off to a side of it: something to glance at.
     const elsewhere = () => {
         const box = root.getBoundingClientRect();
@@ -547,6 +624,17 @@ export function enliven(root, { mood, colors: inks = {}, assets = `/mascot/${VER
     // What it does with itself when nothing is asking for its attention.
     const idle = () => {
         later(idle, lost ? within(LOST.every) : rand(1300, 3000));
+        // Busy: concentrating until it is done (and no dozing off meanwhile).
+        const working = !!document.querySelector(BUSY);
+        if (working !== busy) {
+            busy = working;
+            if (busy)
+                wake();
+            if (!held)
+                rest();
+        }
+        if (busy)
+            moved = performance.now();
         if (still() || document.hidden || held || hovered || target || asleep)
             return;
         const quiet = performance.now() - moved;
@@ -579,6 +667,10 @@ export function enliven(root, { mood, colors: inks = {}, assets = `/mascot/${VER
         }
         if (page.cursor && quiet < BORED)
             return; // busy watching the cursor
+        if (busy)
+            return; // its eyes stay on the work
+        if (chance(EMOTE.chance))
+            return emote();
         const roll = Math.random();
         if (roll < 0.5)
             watching = "you";
@@ -649,8 +741,37 @@ export function enliven(root, { mood, colors: inks = {}, assets = `/mascot/${VER
                 fire("hop");
         }
         spin();
+        nose();
         if (performance.now() > scanningUntil)
             watching = "cursor"; // a look around isn't cut short by a twitch of the mouse
+    };
+    // The cursor resting on its nose: it goes cross-eyed looking at it.
+    let noseTimer;
+    const onNose = () => {
+        const cursor = page.cursor;
+        if (!cursor || !hovered)
+            return false;
+        const box = root.getBoundingClientRect();
+        const unit = box.width / 32 || 1;
+        return (Math.hypot(cursor.x - (box.left + NOSE.at.x * unit), cursor.y - (box.top + NOSE.at.y * unit)) <
+            NOSE.near * unit);
+    };
+    const nose = () => {
+        clearTimeout(noseTimer);
+        if (crossed) {
+            crossed = false;
+            if (!held)
+                rest();
+        }
+        if (!onNose())
+            return;
+        noseTimer = later(() => {
+            if (!onNose())
+                return;
+            crossed = true;
+            if (!held)
+                rest();
+        }, NOSE.ms);
     };
     // The cursor left the page: look after it for a moment, a little sad.
     const onLeave = () => {
@@ -677,7 +798,10 @@ export function enliven(root, { mood, colors: inks = {}, assets = `/mascot/${VER
         set("dark", !bright()); // the file opens or closes the pupils, overshooting
         requestAnimationFrame(colors); // once the new theme's colours apply
         if (theme !== "dark") {
-            // Lights on: flinch shut, peek out squinting, relax.
+            // Lights on: now and then the glare makes it sneeze.
+            if (!still() && chance(SNEEZE.lights))
+                return sneeze();
+            // Otherwise: flinch shut, peek out squinting, relax.
             if (!still())
                 blink(LIGHTS.flinch);
             hold("dazzled", LIGHTS.squint);
@@ -764,12 +888,16 @@ export function enliven(root, { mood, colors: inks = {}, assets = `/mascot/${VER
             run();
         }, at);
     };
-    // Copied: a little start, as if to say "got it".
+    // Copied: a little start, then pleased with itself, as if to say "got it".
     const onCopy = () => {
         if (!selecting)
             return;
         blink();
-        hold("surprised", READ.copied);
+        hold("surprised", READ.copied + 50);
+        later(() => {
+            if (face === "surprised")
+                hold("smug", READ.smug);
+        }, READ.copied);
     };
     page.onMove.add(onMove);
     page.onSelect.add(onSelect);
@@ -786,6 +914,7 @@ export function enliven(root, { mood, colors: inks = {}, assets = `/mascot/${VER
     }, { signal });
     host.addEventListener("pointerleave", () => {
         hovered = false;
+        crossed = false;
         if (!held)
             rest();
     }, { signal });
@@ -806,7 +935,7 @@ export function enliven(root, { mood, colors: inks = {}, assets = `/mascot/${VER
                     ? "annoyed"
                     : "surprised";
         hold(mood, mood === "dead"
-            ? TEMPER.out
+            ? TEMPER.out + 50
             : mood === "furious"
                 ? TEMPER.rage
                 : mood === "annoyed"
@@ -817,7 +946,11 @@ export function enliven(root, { mood, colors: inks = {}, assets = `/mascot/${VER
             rage();
             temper = 0;
             outUntil = at + TEMPER.out;
-            later(() => blink(BLINK.slow), TEMPER.out);
+            // …and comes round whistling, as if nothing happened.
+            later(() => {
+                blink(BLINK.slow);
+                hold("whistle", TEMPER.whistle);
+            }, TEMPER.out);
         }
         else if (mood === "furious")
             rage();

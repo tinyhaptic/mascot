@@ -33,9 +33,13 @@ import { $ } from "bun";
 
 import {
 	COLOR,
+	corners,
 	EYES,
+	eyePose,
+	gazeOf,
 	SPIRAL,
 	poses,
+	tongueRoot,
 	type Face,
 	type Pose,
 } from "../src/mascot.ts";
@@ -91,6 +95,8 @@ const K = {
 	outRot: 86,
 	outDist: 87,
 	color: 37,
+	cornerBL: 162,
+	cornerBR: 163,
 } as const;
 
 // ── the view model ──────────────────────────────────────────────────────────
@@ -108,14 +114,15 @@ const prop = (name: string, kind: string, init?: Prop["init"]) =>
 	(props[name] = { id: id(), kind, init }).id;
 const P = {
 	face: prop("face", "EnumCustom", faceValue.hi),
-	lookX: prop("lookX", "Number", poses.hi.pupils[0].x),
-	lookY: prop("lookY", "Number", poses.hi.pupils[0].y),
+	lookX: prop("lookX", "Number", gazeOf(poses.hi).x),
+	lookY: prop("lookY", "Number", gazeOf(poses.hi).y),
 	headX: prop("headX", "Number", 0),
 	headY: prop("headY", "Number", 0),
 	shut: prop("shut", "Boolean", false),
 	dark: prop("dark", "Boolean", false),
 	dizzy: prop("dizzy", "Boolean", false),
 	asleep: prop("asleep", "Boolean", false),
+	whistle: prop("whistle", "Boolean", false),
 	wiggle: prop("wiggle", "Trigger"),
 	pop: prop("pop", "Trigger"),
 	hop: prop("hop", "Trigger"),
@@ -305,6 +312,7 @@ const eyeIds = () => ({
 	lidClip: [id(), id()],
 	aperture: [id(), [id(), id(), id(), id(), id(), id()]] as const,
 	gaze: id(),
+	cross: id(), // this eye's own pupil, off where the pair is looking (cross-eyed)
 	dizzy: id(),
 	iris: id(),
 	pupil: id(),
@@ -316,6 +324,7 @@ const eyeIds = () => ({
 });
 const eyes = EYES.at.map(() => eyeIds());
 const mouth = { shape: id(), l: id(), r: id() };
+const tongue = { node: id(), rect: id(), groove: id() };
 const body = id();
 const head = id();
 const breath = id();
@@ -366,7 +375,7 @@ const scaled = (keys: Key[]): Key[] =>
 
 function eyeKeys(p: Pose): Key[] {
 	return eyes.flatMap((e, i) => {
-		const g = eyeGeometry(p, i ? 1 : -1);
+		const g = eyeGeometry(eyePose(p, i), i ? 1 : -1);
 		const [lt, lr] = e.lidLine;
 		const [ct, cr] = e.cheekLine;
 		const ap = apertureKeys(e.aperture[1], g, 0);
@@ -394,11 +403,15 @@ function eyeKeys(p: Pose): Key[] {
 }
 
 function mouthKeys({ mouth: m }: Pose): Key[] {
-	// Two curves between the corners: over the top, then back along the bottom.
-	const cx = rel(EYES.mouth);
-	const [up, down] = [
-		Math.hypot(m.inset, m.upper),
-		Math.hypot(m.inset, m.lower),
+	// Two curves between the corners: over the top, then back along the bottom. A slant lifts
+	// one corner, so each corner's handles reach a different height to the same middle.
+	const [[lx, ly], [rx, ry]] = corners(m);
+	const half = (m.slant ?? 0) / 2;
+	const [upL, downL, upR, downR] = [
+		m.upper - half,
+		m.lower - half,
+		m.upper + half,
+		m.lower + half,
 	];
 	// Angles are kept on one side of the turn so a change of face swings the handles the short way round.
 	const right = (dy: number) => {
@@ -406,29 +419,51 @@ function mouthKeys({ mouth: m }: Pose): Key[] {
 		return a < 0 ? a + 2 * Math.PI : a;
 	};
 	return [
-		[mouth.l, K.vx, cx - m.w * S],
-		[mouth.l, K.vy, rel(m.y)],
-		[mouth.l, K.outRot, Math.atan2(m.upper, m.inset)],
-		[mouth.l, K.outDist, up * S],
-		[mouth.l, K.inRot, Math.atan2(m.lower, m.inset)],
-		[mouth.l, K.inDist, down * S],
-		[mouth.r, K.vx, cx + m.w * S],
-		[mouth.r, K.vy, rel(m.y)],
-		[mouth.r, K.inRot, right(m.upper)],
-		[mouth.r, K.inDist, up * S],
-		[mouth.r, K.outRot, right(m.lower)],
-		[mouth.r, K.outDist, down * S],
+		[mouth.l, K.vx, rel(lx)],
+		[mouth.l, K.vy, rel(ly)],
+		[mouth.l, K.outRot, Math.atan2(upL, m.inset)],
+		[mouth.l, K.outDist, Math.hypot(m.inset, upL) * S],
+		[mouth.l, K.inRot, Math.atan2(downL, m.inset)],
+		[mouth.l, K.inDist, Math.hypot(m.inset, downL) * S],
+		[mouth.r, K.vx, rel(rx)],
+		[mouth.r, K.vy, rel(ry)],
+		[mouth.r, K.inRot, right(upR)],
+		[mouth.r, K.inDist, Math.hypot(m.inset, upR) * S],
+		[mouth.r, K.outRot, right(downR)],
+		[mouth.r, K.outDist, Math.hypot(m.inset, downR) * S],
 	];
 }
 
-const pupilKeys = (p: Pose): Key[] =>
-	eyes.flatMap(
-		(e) =>
+// The tongue: out and tilted on the faces that show it; otherwise drawn up into the mouth and gone.
+const TONGUE_IN = { dx: 0, len: 0.6, w: 1.4, turn: 0 };
+function tongueKeys({ mouth: m, tongue: t }: Pose): Key[] {
+	const shown = t ?? TONGUE_IN;
+	const { x, y } = tongueRoot(m, shown);
+	return [
+		[tongue.node, K.x, rel(x)],
+		[tongue.node, K.y, rel(y)],
+		[tongue.node, K.rotation, (shown.turn * Math.PI) / 180],
+		[tongue.node, K.opacity, t ? 1 : 0],
+		[tongue.rect, K.width, shown.w * 2 * S],
+		[tongue.rect, K.height, shown.len * S],
+		[tongue.rect, K.cornerBL, Math.min(shown.w, shown.len) * S],
+		[tongue.rect, K.cornerBR, Math.min(shown.w, shown.len) * S],
+		[tongue.groove, K.height, Math.max(0, shown.len - shown.w * 0.9 - 0.4) * S],
+	];
+}
+
+const pupilKeys = (p: Pose): Key[] => {
+	const gaze = gazeOf(p);
+	return eyes.flatMap(
+		(e, i) =>
 			[
 				[e.pupil, K.width, p.pupil.rx * 2 * S],
 				[e.pupil, K.height, p.pupil.ry * 2 * S],
+				[e.cross, K.x, (p.pupils[i].x - gaze.x) * S],
+				[e.cross, K.y, (p.pupils[i].y - gaze.y) * S],
 			] as Key[],
 	);
+};
 const spiralKeys = (dead: boolean): Key[] =>
 	eyes.flatMap(
 		(e) =>
@@ -442,6 +477,7 @@ const spiralKeys = (dead: boolean): Key[] =>
 const faceKeys = (face: Face): Key[] => [
 	...eyeKeys(poses[face]),
 	...mouthKeys(poses[face]),
+	...tongueKeys(poses[face]),
 	...pupilKeys(poses[face]),
 	...spiralKeys(face === "dead"),
 ];
@@ -563,8 +599,8 @@ const eyeShapes = (e: EyeIds, i: number) =>
 			el(
 				"Node",
 				{
-					x: poses.hi.pupils[i].x * S,
-					y: poses.hi.pupils[i].y * S,
+					x: gazeOf(poses.hi).x * S,
+					y: gazeOf(poses.hi).y * S,
 					name: "Gaze",
 					id: e.gaze,
 				},
@@ -572,22 +608,31 @@ const eyeShapes = (e: EyeIds, i: number) =>
 				bind(P.lookY, K.y, conv.look),
 				el(
 					"Node",
-					{ name: "Dizzy", id: e.dizzy },
+					{
+						x: v(e.cross, K.x),
+						y: v(e.cross, K.y),
+						name: "Own way",
+						id: e.cross,
+					},
 					el(
 						"Node",
-						{ name: "Iris", id: e.iris },
+						{ name: "Dizzy", id: e.dizzy },
 						el(
-							"Shape",
-							{ name: "Pupil" },
-							el("Ellipse", {
-								width: v(e.pupil, K.width),
-								height: v(e.pupil, K.height),
-								name: "Path",
-								id: e.pupil,
-							}),
-							fill(argb(COLOR.pupil)),
-							clip(e.ballFill[0]),
-							clip(e.aperture[0]),
+							"Node",
+							{ name: "Iris", id: e.iris },
+							el(
+								"Shape",
+								{ name: "Pupil" },
+								el("Ellipse", {
+									width: v(e.pupil, K.width),
+									height: v(e.pupil, K.height),
+									name: "Path",
+									id: e.pupil,
+								}),
+								fill(argb(COLOR.pupil)),
+								clip(e.ballFill[0]),
+								clip(e.aperture[0]),
+							),
 						),
 					),
 				),
@@ -672,6 +717,48 @@ const mouthShape = el(
 		),
 	),
 	strokeBound(1.5 * S, P.ink, "FF0A0A0A"),
+);
+
+// Hangs from the top of its node (the middle of the mouth), behind the mouth's line.
+const tongueShape = el(
+	"Node",
+	{
+		x: v(tongue.node, K.x),
+		y: v(tongue.node, K.y),
+		opacity: 0,
+		name: "Tongue",
+		id: tongue.node,
+	},
+	el(
+		"Shape",
+		{ name: "Groove" },
+		el("Rectangle", {
+			y: 0.4 * S,
+			originY: 0,
+			width: 0.5 * S,
+			height: v(tongue.groove, K.height),
+			cornerRadiusTL: 0.25 * S,
+			name: "Path",
+			id: tongue.groove,
+		}),
+		fillBound(P.ink3, "FF999999"),
+	),
+	el(
+		"Shape",
+		{ name: "Tongue" },
+		el("Rectangle", {
+			originY: 0,
+			width: v(tongue.rect, K.width),
+			height: v(tongue.rect, K.height),
+			linkCornerRadius: false,
+			cornerRadiusBL: v(tongue.rect, K.cornerBL),
+			cornerRadiusBR: v(tongue.rect, K.cornerBR),
+			name: "Path",
+			id: tongue.rect,
+		}),
+		fill(argb(COLOR.tongue)),
+		strokeBound(1.1 * S, P.ink, "FF0A0A0A"),
+	),
 );
 
 // ── particles ───────────────────────────────────────────────────────────────
@@ -797,6 +884,71 @@ const zShapes = zs.map((z) => {
 			].map(([x, y]) => el("StraightVertex", { x, y, name: "Point" })),
 		),
 		strokeBound(z.em * 0.12, P.ink3, "FF999999"),
+	);
+});
+
+// Two notes drifting up off to the right of a whistling mouth, in turn.
+const notes = [
+	{
+		id: id(),
+		x: 0.66,
+		y: 0.74,
+		size: 1,
+		dx: 0.32,
+		dy: -0.5,
+		turn: 0.25,
+		from: 0,
+	},
+	{
+		id: id(),
+		x: 0.7,
+		y: 0.7,
+		size: 0.75,
+		dx: 0.42,
+		dy: -0.36,
+		turn: -0.2,
+		from: 51,
+	},
+];
+const NOTE_LIFE = 51; // frames each note is up; together they loop every 1.7 s
+const noteShapes = notes.map((note) => {
+	const u = note.size * 1.3 * S; // a note's unit
+	return el(
+		"Node",
+		{
+			x: at(32 * note.x),
+			y: at(32 * note.y),
+			opacity: 0,
+			name: "Note",
+			id: note.id,
+		},
+		el(
+			"Shape",
+			{ name: "Note" },
+			el("Ellipse", {
+				x: -0.75 * u,
+				rotation: -0.35,
+				width: 2 * u,
+				height: 1.5 * u,
+				name: "Head",
+			}),
+			el("Rectangle", {
+				x: 0.05 * u,
+				y: -1.9 * u,
+				width: 0.45 * u,
+				height: 3.8 * u,
+				name: "Stem",
+			}),
+			el("Rectangle", {
+				x: 0.85 * u,
+				y: -3.4 * u,
+				rotation: 0.5,
+				width: 1.8 * u,
+				height: 0.5 * u,
+				name: "Flag",
+			}),
+			fillBound(P.ink3, "FF999999"),
+		),
 	);
 });
 
@@ -1143,6 +1295,44 @@ for (const z of zs) {
 		);
 }
 const zsAnim = animation("Z's", zTrack, Z_LIFE * 2, "loop");
+
+const noteTrack = track();
+for (const note of notes) {
+	const [x, y] = [at(32 * note.x), at(32 * note.y)];
+	const life = (share: number) => note.from + Math.round(share * NOTE_LIFE);
+	const before = note.from
+		? [{ frame: 0, value: 0, ease: "hold" as const }]
+		: [];
+	const drift: [number, number, number][] = [
+		[K.x, x, x + note.dx * 32 * S],
+		[K.y, y, y + note.dy * 32 * S],
+		[K.rotation, 0, note.turn],
+		[K.scaleX, 0.5, 1],
+		[K.scaleY, 0.5, 1],
+	];
+	put(
+		noteTrack,
+		note.id,
+		K.opacity,
+		...before,
+		{ frame: life(0), value: 0 },
+		{ frame: life(0.2), value: 1 },
+		{ frame: life(1), value: 0 },
+	);
+	for (const [k, from, to] of drift)
+		put(
+			noteTrack,
+			note.id,
+			k,
+			{ frame: life(0), value: from, ease: [0, 0, 0.58, 1] },
+			{ frame: life(1), value: to },
+		);
+}
+const notesAnim = animation("Notes", noteTrack, NOTE_LIFE * 2, "loop");
+const noNotes = animation(
+	"No notes",
+	pose(notes.map((note): Key => [note.id, K.opacity, 0])),
+);
 const noZs = animation(
 	"No z's",
 	pose(zs.map((z): Key => [z.id, K.opacity, 0])),
@@ -1350,6 +1540,14 @@ const snoring = state(
 );
 awake.out = [{ to: snoring.id, if: when.is(P.asleep, true) }];
 
+const quiet = state(noNotes);
+const whistling = state(
+	notesAnim,
+	[{ to: quiet.id, ms: 200, if: when.is(P.whistle, false) }],
+	true,
+);
+quiet.out = [{ to: whistling.id, if: when.is(P.whistle, true) }];
+
 const upright = state(restPop);
 const pops = again(popAnim);
 const hopping = state(hopAnim, [], true);
@@ -1390,6 +1588,7 @@ const machineXml = el(
 	...sparkLayers,
 	layer("Poke lines", [{ to: noLines.id }], [noLines, ...lines]),
 	layer("Sleep", [{ to: awake.id }], [awake, snoring]),
+	layer("Whistle", [{ to: quiet.id }], [quiet, whistling]),
 	layer("Bounce", [{ to: upright.id }], [upright, ...pops, hopping]),
 );
 
@@ -1414,6 +1613,7 @@ const scene = el(
 		impactShapes,
 		...sparkShapes,
 		...zShapes,
+		...noteShapes,
 		el(
 			"Node",
 			{ x: SIZE / 2, y: SIZE / 2, name: "Body", id: body },
@@ -1432,6 +1632,7 @@ const scene = el(
 							"Node",
 							{ name: "Breath", id: breath },
 							mouthShape,
+							tongueShape,
 							...eyes.map(spiralShapes),
 							...eyes.map(eyeShapes),
 							...eyes.map(shadowShapes),

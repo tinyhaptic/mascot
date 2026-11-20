@@ -24,6 +24,7 @@ export const COLOR = {
     pupil: "#0a0a0a",
     shadow: "#8a8a8a",
     rage: "#ff3b30",
+    tongue: "#ff6f8e",
 };
 // A flat mouth with `inset` two thirds of `w` is a plain arc (a quadratic curve).
 const mouths = {
@@ -35,11 +36,18 @@ const mouths = {
     scowl: { w: 2.5, upper: -1.1, lower: -1.1, inset: 1.67, y: 26 },
     gape: { w: 1.25, upper: -1.67, lower: 1.67, inset: 0, y: 25.7 },
     yawn: { w: 2.7, upper: -4.6, lower: 5.4, inset: 0, y: 25.8 },
+    tiny: { w: 1.2, upper: 0.3, lower: 0.3, inset: 0.8, y: 25.4 },
+    wavy: { w: 2.4, upper: 0.2, lower: 0.2, inset: 1.6, y: 25.4 },
+    pucker: { w: 0.65, upper: -0.75, lower: 0.75, inset: 0, y: 25.5 },
+    o: { w: 0.8, upper: -0.9, lower: 0.9, inset: 0, y: 25.6 },
+    sniff: { w: 1.3, upper: -1.6, lower: 1.6, inset: 0, y: 25.6 },
+    achoo: { w: 2.3, upper: -2.6, lower: 3.4, inset: 0, y: 25.6 },
 };
 const both = (x, y) => [
     { x, y },
     { x, y },
 ];
+const each = (l, r) => [l, r];
 const hi = {
     open: 1,
     lid: 0,
@@ -149,7 +157,84 @@ export const poses = {
         pupil: { rx: 2.61, ry: 3.42 },
         pupils: both(-1.8, 0.72),
     },
+    // A wink with the tongue poking out of the corner of a lopsided smile.
+    cheeky: {
+        ...hi,
+        mouth: { ...mouths.smile, slant: 0.5 },
+        eyes: [{ cheek: 0.35 }, { open: 0 }],
+        tongue: { dx: 0.9, len: 4.4, w: 1.75, turn: -14 },
+    },
+    // Hard at work: lids lowered, eyes on the job below, the tip of the tongue out at the side.
+    focused: {
+        ...hi,
+        mouth: { ...mouths.tiny, dx: 0.3, slant: -0.4 },
+        lid: 0.32,
+        tilt: 0.12,
+        pupils: both(-1.4, 2.2),
+        tongue: { dx: 1.5, len: 3.3, w: 1.4, turn: -38 },
+    },
+    // Lights on, nobody home: pupils wandering off on their own, tongue lolling.
+    derp: {
+        ...hi,
+        mouth: { ...mouths.wavy, slant: -0.7 },
+        pupil: { rx: 2.1, ry: 2.7 },
+        pupils: each({ x: 1.6, y: -2.2 }, { x: -1.8, y: 2.6 }),
+        tongue: { dx: -1.2, len: 3.5, w: 1.5, turn: 20 },
+    },
+    // Looking at the end of its own nose.
+    crosseyed: {
+        ...hi,
+        mouth: mouths.o,
+        size: 1.04,
+        pupil: { rx: 2.2, ry: 2.9 },
+        pupils: each({ x: 2.4, y: 1.2 }, { x: -2.6, y: 1.2 }),
+    },
+    // Not sure about this: lids half down, eyes sliding to one side, mouth pulled over.
+    sideeye: {
+        ...hi,
+        mouth: { ...mouths.flat, dx: 0.6, slant: -0.5 },
+        lid: 0.42,
+        tilt: 0.06,
+        pupils: both(2.4, 0.9),
+    },
+    // Pleased with itself: heavy lids, cheeks up, a smirk.
+    smug: {
+        ...hi,
+        mouth: { ...mouths.smile, w: 2.2, dx: 0.4, slant: 1.2 },
+        lid: 0.4,
+        cheek: 0.35,
+        tilt: -0.12,
+        pupils: both(-0.6, 0.4),
+    },
+    // Nothing to see here: eyes up and away, lips pursed to whistle (notes drift off while it does).
+    whistle: {
+        ...hi,
+        mouth: { ...mouths.pucker, dx: 1.2 },
+        pupil: { rx: 2.5, ry: 3.3 },
+        pupils: both(1.4, -2.4),
+    },
+    // A sneeze coming: eyes screwing up, looking up, mouth opening…
+    sneeze: {
+        ...hi,
+        mouth: mouths.sniff,
+        lid: 0.5,
+        cheek: 0.6,
+        tilt: -0.25,
+        pupils: both(0, -1.5),
+    },
+    // …and out it comes: eyes squeezed shut, mouth wide.
+    achoo: { ...hi, open: 0, mouth: mouths.achoo },
 };
+/** One eye's pose: the pair's, with that eye's own lids over it (0 left, 1 right). */
+export const eyePose = (pose, i) => ({
+    ...pose,
+    ...pose.eyes?.[i],
+});
+/** Where the pair looks when the face is at rest: between where its two pupils sit. */
+export const gazeOf = ({ pupils: [l, r] }) => ({
+    x: (l.x + r.x) / 2,
+    y: (l.y + r.y) / 2,
+});
 const n = (v) => +v.toFixed(2);
 const lerp = (a, b, t) => a + (b - a) * t;
 /** One eye. `side` is -1 for the left eye, 1 for the right. */
@@ -196,11 +281,30 @@ function eye(eyes, cx, side, { open, lid, cheek, tilt, size }) {
         `${arc}${n(cx + a.x)} ${n(cy + a.y)}z`);
 }
 const pupil = (cx, cy, { rx, ry }) => `M${n(cx - rx)} ${n(cy)}a${n(rx)} ${n(ry)} 0 1 0 ${n(rx * 2)} 0a${n(rx)} ${n(ry)} 0 1 0 ${n(-rx * 2)} 0z`;
-function mouth(x, { w, upper, lower, inset, y }) {
-    const [l, r] = [x - w, x + w];
-    const [li, ri] = [l + inset, r - inset];
-    return (`M${n(l)} ${n(y)}C${n(li)} ${n(y + upper)} ${n(ri)} ${n(y + upper)} ${n(r)} ${n(y)}` +
-        `C${n(ri)} ${n(y + lower)} ${n(li)} ${n(y + lower)} ${n(l)} ${n(y)}z`);
+/** The mouth's corners: [x, y] left and right. */
+export const corners = ({ w, y, dx = 0, slant = 0 }, x = EYES.mouth) => [
+    [x + dx - w, y + slant / 2],
+    [x + dx + w, y - slant / 2],
+];
+function mouth(x, m) {
+    const [[l, yl], [r, yr]] = corners(m, x);
+    const [li, ri] = [l + m.inset, r - m.inset];
+    const ym = (yl + yr) / 2;
+    return (`M${n(l)} ${n(yl)}C${n(li)} ${n(ym + m.upper)} ${n(ri)} ${n(ym + m.upper)} ${n(r)} ${n(yr)}` +
+        `C${n(ri)} ${n(ym + m.lower)} ${n(li)} ${n(ym + m.lower)} ${n(l)} ${n(yl)}z`);
+}
+/** Where the tongue hangs from: the middle of the mouth, shifted along it. */
+export const tongueRoot = (m, t, x = EYES.mouth) => {
+    const [[l, yl], [r, yr]] = corners(m, x);
+    return { x: (l + r) / 2 + t.dx, y: (yl + yr) / 2 };
+};
+/** The tongue: straight sides down from the mouth, a round tip. Drawn hanging, then tilted. */
+function tongue(mx, m, t) {
+    const { x, y } = tongueRoot(m, t, mx);
+    const turn = (t.turn * Math.PI) / 180;
+    const at = (px, py) => `${n(x + px * Math.cos(turn) - py * Math.sin(turn))} ${n(y + px * Math.sin(turn) + py * Math.cos(turn))}`;
+    const side = Math.max(0, t.len - t.w);
+    return `M${at(-t.w, 0)}L${at(-t.w, side)}A${n(t.w)} ${n(t.w)} 0 0 0 ${at(t.w, side)}L${at(t.w, 0)}z`;
 }
 /**
  * Path data for a pose: both eyes in one path, both pupils in another, and the mouth. The
@@ -208,12 +312,19 @@ function mouth(x, { w, upper, lower, inset, y }) {
  * `hi` they sit wholly inside, so a static copy can skip the clip.
  */
 export const shapes = (pose, eyes = EYES) => ({
-    eye: eyes.at.map((cx, i) => eye(eyes, cx, i ? 1 : -1, pose)).join(""),
+    eye: eyes.at
+        .map((cx, i) => eye(eyes, cx, i ? 1 : -1, eyePose(pose, i)))
+        .join(""),
     pupil: eyes.at
         .map((cx, i) => pupil(cx + pose.pupils[i].x, eyes.cy + pose.pupils[i].y, pose.pupil))
         .join(""),
     mouth: mouth(eyes.mouth, pose.mouth),
+    tongue: pose.tongue ? tongue(eyes.mouth, pose.mouth, pose.tongue) : "",
 });
+/** The tongue, filled and outlined in `line`, for faces that put it out. */
+export const tongueSvg = (d, line) => d
+    ? `<path d="${d}" fill="${COLOR.tongue}" stroke="${line}" stroke-linejoin="round" stroke-width="1.1"/>`
+    : "";
 /** The knocked-out eye's spiral: how many turns, how far out it reaches, and its line. */
 export const SPIRAL = { turns: 2.25, r: 4.6, weight: 1.25 };
 /** Path data for one spiral, centred on the origin so it can be placed and turned about its middle. */
@@ -234,7 +345,8 @@ function paint(eyes, pose, line, weight, withMouth) {
         `<path d="${s.eye}" fill="${COLOR.eye}" ${stroke(line)}/>` +
         `<path d="${s.pupil}" fill="${COLOR.pupil}"/>` +
         (withMouth
-            ? `<path d="${s.mouth}" fill="none" stroke="${line}" stroke-linejoin="round" stroke-width="${n(1.5 * weight)}"/>`
+            ? tongueSvg(s.tongue, line) +
+                `<path d="${s.mouth}" fill="none" stroke="${line}" stroke-linejoin="round" stroke-width="${n(1.5 * weight)}"/>`
             : ""));
 }
 /**
@@ -249,6 +361,7 @@ export function portrait(pose, line, id = "mascot-eyes") {
         `<path d="${s.eye}" fill="${COLOR.eye}"/>` +
         `<path d="${s.pupil}" fill="${COLOR.pupil}" clip-path="url(#${id})"/>` +
         `<path d="${s.eye}" fill="none" ${stroke(line)}/>` +
+        tongueSvg(s.tongue, line) +
         `<path d="${s.mouth}" fill="none" stroke="${line}" stroke-linejoin="round" stroke-width="1.5"/>`);
 }
 /** Standalone SVG markup for a face, outlined in `line`. */

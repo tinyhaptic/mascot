@@ -6,6 +6,7 @@ import {
 	SPIRAL,
 	shapes,
 	spiral,
+	tongueSvg,
 } from "./mascot.js";
 
 export type MascotSvgOptions = {
@@ -41,6 +42,6 @@ export function mascotSvg({ face = "hi", id }: MascotSvgOptions): string {
 					`<g transform="translate(${cx} ${EYES.cy})"><path d="${spiral()}" ${swirl}/></g>`,
 			)
 			.join("") +
-		`</g><path d="${s.mouth}" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.5"/>`
+		`</g>${tongueSvg(s.tongue, "currentColor")}<path d="${s.mouth}" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.5"/>`
 	);
 }

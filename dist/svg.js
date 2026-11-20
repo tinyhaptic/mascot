@@ -1,4 +1,4 @@
-import { COLOR, EYES, poses, SPIRAL, shapes, spiral, } from "./mascot.js";
+import { COLOR, EYES, poses, SPIRAL, shapes, spiral, tongueSvg, } from "./mascot.js";
 /**
  * The inside of a mascot's `<svg viewBox="0 0 32 32">`: the eyes, each with
  * its shadow, the pupils, the mouth, and the spirals a knocked-out mascot
@@ -21,5 +21,5 @@ export function mascotSvg({ face = "hi", id }) {
         EYES.at
             .map((cx) => `<g transform="translate(${cx} ${EYES.cy})"><path d="${spiral()}" ${swirl}/></g>`)
             .join("") +
-        `</g><path d="${s.mouth}" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.5"/>`);
+        `</g>${tongueSvg(s.tongue, "currentColor")}<path d="${s.mouth}" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="1.5"/>`);
 }

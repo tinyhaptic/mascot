@@ -26,7 +26,23 @@ type Mouth = {
     inset: number;
     /** Height of the corners. */
     y: number;
+    /** How far it sits right of the middle. */
+    dx?: number;
+    /** How much higher the right corner sits than the left (a lopsided smirk). */
+    slant?: number;
 };
+/** A tongue hanging from the middle of the mouth. */
+type Tongue = {
+    /** How far right of the mouth's middle it hangs. */
+    dx: number;
+    /** How far it reaches down from the mouth, and its half-width. */
+    len: number;
+    w: number;
+    /** Its tilt, in degrees: positive swings its tip to the left. */
+    turn: number;
+};
+/** What each eye can wear on its own (a wink): the lids, and how big it is. */
+export type Lids = Pick<Pose, "open" | "lid" | "cheek" | "tilt" | "size">;
 export type Pose = {
     /** 1 wide open … 0 shut. */
     open: number;
@@ -50,8 +66,11 @@ export type Pose = {
     /** Each pupil's offset from the centre of its eye. */
     pupils: [Point, Point];
     mouth: Mouth;
+    /** Each eye's own lids, over the pair's (left, right). */
+    eyes?: [Partial<Lids>, Partial<Lids>];
+    tongue?: Tongue;
 };
-export type Face = "hi" | "blink" | "surprised" | "sad" | "skeptical" | "sleepy" | "curious" | "dazzled" | "annoyed" | "peering" | "lost" | "furious" | "dizzy" | "asleep" | "dead" | "yawn";
+export type Face = "hi" | "blink" | "surprised" | "sad" | "skeptical" | "sleepy" | "curious" | "dazzled" | "annoyed" | "peering" | "lost" | "furious" | "dizzy" | "asleep" | "dead" | "yawn" | "cheeky" | "focused" | "derp" | "crosseyed" | "sideeye" | "smug" | "whistle" | "sneeze" | "achoo";
 /** Where the eyes sit and how big they are. */
 export type Eyes = {
     /** Centre x of each eye, and the centre y they share. */
@@ -83,8 +102,20 @@ export declare const COLOR: {
     readonly pupil: "#0a0a0a";
     readonly shadow: "#8a8a8a";
     readonly rage: "#ff3b30";
+    readonly tongue: "#ff6f8e";
 };
 export declare const poses: Record<Face, Pose>;
+/** One eye's pose: the pair's, with that eye's own lids over it (0 left, 1 right). */
+export declare const eyePose: (pose: Pose, i: number) => Pose;
+/** Where the pair looks when the face is at rest: between where its two pupils sit. */
+export declare const gazeOf: ({ pupils: [l, r] }: Pose) => Point;
+/** The mouth's corners: [x, y] left and right. */
+export declare const corners: ({ w, y, dx, slant }: Mouth, x?: number) => readonly [readonly [number, number], readonly [number, number]];
+/** Where the tongue hangs from: the middle of the mouth, shifted along it. */
+export declare const tongueRoot: (m: Mouth, t: Tongue, x?: number) => {
+    x: number;
+    y: number;
+};
 /**
  * Path data for a pose: both eyes in one path, both pupils in another, and the mouth. The
  * pupils are meant to be clipped to the eyes (they slide under the lid); in
@@ -94,7 +125,10 @@ export declare const shapes: (pose: Pose, eyes?: Eyes) => {
     eye: string;
     pupil: string;
     mouth: string;
+    tongue: string;
 };
+/** The tongue, filled and outlined in `line`, for faces that put it out. */
+export declare const tongueSvg: (d: string, line: string) => string;
 /** The knocked-out eye's spiral: how many turns, how far out it reaches, and its line. */
 export declare const SPIRAL: {
     readonly turns: 2.25;
