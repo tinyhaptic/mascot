@@ -24,6 +24,6 @@ export function Mascot({ className, alive = true, face, mood, pokeColor, zColor,
     return (_jsxs(_Fragment, { children: [_jsx("style", { href: "tinyhaptic-mascot", precedence: "default", children: css }), _jsx("svg", { ref: ref, viewBox: "0 0 32 32", "aria-hidden": "true", "data-alive": alive || undefined, "data-mood": mood, className: ["mascot", shown === "dead" && "dead", className]
                     .filter(Boolean)
                     .join(" "), 
-                // biome-ignore lint/security/noDangerouslySetInnerHtml: the package's own drawing, no outside input
+                // eslint-disable-next-line react/no-danger -- the package's own drawing, no outside input
                 dangerouslySetInnerHTML: { __html: mascotSvg({ face: shown, id }) } })] }));
 }

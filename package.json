@@ -1,7 +1,16 @@
 {
 	"name": "@tinyhaptic/mascot",
 	"version": "1.1.0",
+	"private": true,
 	"description": "The Tiny Haptic mascot: a plain JavaScript core, React and Astro components, and its icons.",
+	"bin": {
+		"mascot": "./dist/cli.js"
+	},
+	"files": [
+		"dist",
+		"astro",
+		"mascot.css"
+	],
 	"type": "module",
 	"sideEffects": [
 		"*.css"
@@ -18,17 +27,19 @@
 		"./astro": "./astro/Mascot.astro",
 		"./mascot.css": "./mascot.css"
 	},
-	"bin": {
-		"mascot": "./dist/cli.js"
-	},
-	"files": [
-		"dist",
-		"astro",
-		"mascot.css"
-	],
 	"scripts": {
 		"build": "rm -rf dist && tsc -p tsconfig.json && bun -e 'import { css } from \"./dist/css.js\"; await Bun.write(\"mascot.css\", `/* Written by the build from src/css.ts. */\\n${css}`)' && chmod +x dist/cli.js",
-		"check": "tsc -p tsconfig.json --noEmit && biome check ."
+		"check": "tsc -p tsconfig.json --noEmit && oxfmt --check && oxlint",
+		"format": "oxfmt"
+	},
+	"devDependencies": {
+		"@types/node": "24.19.2",
+		"@types/react": "19.3.0",
+		"oxfmt": "0.79.0",
+		"oxlint": "1.94.0",
+		"oxlint-tsgolint": "7.0.2007",
+		"react": "19.3.1",
+		"typescript": "6.0.3"
 	},
 	"peerDependencies": {
 		"react": ">=19"
@@ -37,12 +48,5 @@
 		"react": {
 			"optional": true
 		}
-	},
-	"devDependencies": {
-		"@biomejs/biome": "2.4.5",
-		"@types/node": "24.19.2",
-		"@types/react": "19.3.0",
-		"react": "19.3.1",
-		"typescript": "6.0.3"
 	}
 }

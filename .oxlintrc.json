@@ -1,0 +1,57 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+	"plugins": ["typescript", "unicorn", "oxc", "react", "jsx-a11y", "import"],
+	"categories": {
+		"correctness": "error",
+		"suspicious": "warn"
+	},
+	"options": {
+		"typeAware": true
+	},
+	"rules": {
+		"react/rules-of-hooks": "error",
+		"react-hooks/exhaustive-deps": "warn",
+		"react/no-array-index-key": "warn",
+		"react/no-danger": "warn",
+		"jsx-a11y/no-static-element-interactions": "warn",
+		"typescript/no-explicit-any": "warn",
+		"no-unused-vars": [
+			"error",
+			{ "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }
+		],
+		"typescript/require-array-sort-compare": [
+			"error",
+			{ "ignoreStringArrays": true }
+		],
+
+		// The new JSX transform needs no React in scope.
+		"react/react-in-jsx-scope": "off",
+		// Same check as react-hooks/exhaustive-deps.
+		"react/exhaustive-effect-dependencies": "off",
+		// React Compiler rules; the app doesn't use the compiler.
+		"react/purity": "off",
+		"react/refs": "off",
+		"react/set-state-in-effect": "off",
+		// Dialogs and the next question focus their first field.
+		"jsx-a11y/no-autofocus": "off",
+		// Empty header cells and rows that open on click.
+		"jsx-a11y/control-has-associated-label": "off",
+		// jsonb and parsed XML are `unknown`, read with String().
+		"typescript/no-base-to-string": "off",
+		"typescript/restrict-template-expressions": "off",
+		"typescript/no-unsafe-type-assertion": "off",
+		// AG-UI's event types are an enum compared with its string values.
+		"typescript/no-unsafe-enum-comparison": "off",
+		"typescript/no-unsafe-enum-assignment": "off",
+		"typescript/no-generated-empty-object-type": "off",
+		"typescript/consistent-return": "off",
+		"import/no-named-as-default-member": "off",
+		"import/no-unassigned-import": "off",
+		"unicorn/consistent-function-scoping": "off",
+		"unicorn/no-array-sort": "off",
+		"unicorn/no-array-reverse": "off",
+		"eslint/no-shadow": "off",
+		"eslint/no-underscore-dangle": "off"
+	},
+	"ignorePatterns": ["dist/**", "mascot.css"]
+}

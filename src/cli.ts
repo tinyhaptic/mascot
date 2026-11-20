@@ -10,6 +10,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+
 import { favicon, icon } from "./icons.js";
 
 const [command, dir, ...flags] = process.argv.slice(2);

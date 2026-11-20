@@ -225,7 +225,7 @@ export function enliven(svg, { mood, colors = {} } = {}) {
     });
     const part = (name) => svg.querySelector(`[data-part="${name}"]`);
     const parts = {
-        head: part("head"),
+        head: svg.querySelector('[data-part="head"]'),
         eye: part("eye"),
         pupil: part("pupil"),
         mouth: part("mouth"),

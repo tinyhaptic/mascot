@@ -263,10 +263,10 @@ export function enliven(
 		attributeFilter: ["data-theme"],
 	});
 
-	const part = <T extends SVGElement = SVGPathElement>(name: string) =>
-		svg.querySelector(`[data-part="${name}"]`) as T;
+	const part = (name: string) =>
+		svg.querySelector(`[data-part="${name}"]`) as SVGPathElement;
 	const parts = {
-		head: part<SVGGElement>("head"),
+		head: svg.querySelector('[data-part="head"]') as SVGGElement,
 		eye: part("eye"),
 		pupil: part("pupil"),
 		mouth: part("mouth"),
@@ -607,8 +607,7 @@ export function enliven(
 		const roll = Math.random();
 		if (roll < 0.5) watching = "you";
 		else if (roll < 0.84) glance(rand(600, 1400));
-		else if (roll < 0.92 && cursor)
-			watching = "cursor"; // check on it again
+		else if (roll < 0.92 && cursor) watching = "cursor"; // check on it again
 		else {
 			glance(1300);
 			hold("skeptical", 1300);
